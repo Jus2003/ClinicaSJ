@@ -1,0 +1,322 @@
+<?php
+require_once 'models/User.php';
+require_once 'models/Role.php';
+
+// Verificar autenticación y permisos de administrador
+if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 1) {
+    header('Location: index.php?action=dashboard');
+    exit;
+}
+
+$userModel = new User();
+$roleModel = new Role();
+
+// Procesar eliminación lógica
+if (isset($_POST['delete_user'])) {
+    $userId = $_POST['user_id'];
+    if ($userModel->deleteUser($userId)) {
+        $success = "Usuario eliminado correctamente";
+    } else {
+        $error = "Error al eliminar el usuario";
+    }
+}
+
+// Parámetros de búsqueda y paginación
+$page = $_GET['page'] ?? 1;
+$search = $_GET['search'] ?? '';
+$roleFilter = $_GET['role_filter'] ?? '';
+$limit = 10;
+
+// Obtener usuarios y total para paginación
+$users = $userModel->getAllUsers($page, $limit, $search, $roleFilter);
+$totalUsers = $userModel->countUsers($search, $roleFilter);
+$totalPages = ceil($totalUsers / $limit);
+
+// Obtener roles para filtro
+$roles = $roleModel->getAllRoles();
+
+include 'views/includes/header.php';
+include 'views/includes/navbar.php';
+?>
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="text-primary">
+                        <i class="fas fa-users-cog"></i> Gestión de Usuarios
+                    </h2>
+                    <p class="text-muted mb-0">Administrar usuarios del sistema</p>
+                </div>
+                <div>
+                    <a href="index.php?action=admin/usuarios/create" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Nuevo Usuario
+                    </a>
+                </div>
+            </div>
+
+            <!-- Mensajes -->
+            <?php if (isset($success)): ?>
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="fas fa-check-circle"></i> <?php echo $success; ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+
+            <?php if (isset($error)): ?>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-triangle"></i> <?php echo $error; ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+
+            <!-- Filtros -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <form method="GET" action="index.php">
+                        <input type="hidden" name="action" value="admin/usuarios">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Buscar</label>
+                                <input type="text" class="form-control" name="search" 
+                                       placeholder="Nombre, email, usuario, cédula..." 
+                                       value="<?php echo htmlspecialchars($search); ?>">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Filtrar por Rol</label>
+                                <select class="form-select" name="role_filter">
+                                    <option value="">Todos los roles</option>
+                                    <?php foreach ($roles as $role): ?>
+                                        <option value="<?php echo $role['id_rol']; ?>" 
+                                                <?php echo $roleFilter == $role['id_rol'] ? 'selected' : ''; ?>>
+                                            <?php echo $role['nombre_rol']; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-outline-primary">
+                                        <i class="fas fa-search"></i> Buscar
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="d-grid">
+                                    <a href="index.php?action=admin/usuarios" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times"></i> Limpiar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Tabla de usuarios -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> Lista de Usuarios 
+                        <span class="badge bg-primary"><?php echo $totalUsers; ?></span>
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (!empty($users)): ?>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th>Nombre Completo</th>
+                                        <th>Email</th>
+                                        <th>Rol</th>
+                                        <th>Sucursal</th>
+                                        <th>Fecha Registro</th>
+                                        <th class="text-center">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($users as $user): ?>
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar-sm bg-primary rounded-circle d-flex align-items-center justify-content-center me-2">
+                                                        <i class="fas fa-user text-white"></i>
+                                                    </div>
+                                                    <div>
+                                                        <strong><?php echo htmlspecialchars($user['username']); ?></strong>
+                                                        <?php if ($user['cedula']): ?>
+                                                            <br><small class="text-muted">CI: <?php echo $user['cedula']; ?></small>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <?php echo htmlspecialchars($user['nombre'] . ' ' . $user['apellido']); ?>
+                                                <?php if ($user['telefono']): ?>
+                                                    <br><small class="text-muted">
+                                                        <i class="fas fa-phone"></i> <?php echo $user['telefono']; ?>
+                                                    </small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($user['email']); ?></td>
+                                            <td>
+                                                <span class="badge bg-<?php 
+                                                    echo match($user['id_rol']) {
+                                                        1 => 'danger',
+                                                        2 => 'warning',
+                                                        3 => 'success',
+                                                        4 => 'info',
+                                                        default => 'secondary'
+                                                    };
+                                                ?>">
+                                                    <?php echo $user['nombre_rol']; ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <?php echo $user['nombre_sucursal'] ?? '<span class="text-muted">Sin asignar</span>'; ?>
+                                            </td>
+                                            <td>
+                                                <small><?php echo date('d/m/Y H:i', strtotime($user['fecha_registro'])); ?></small>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="btn-group" role="group">
+                                                    <a href="index.php?action=admin/usuarios/edit&id=<?php echo $user['id_usuario']; ?>" 
+                                                       class="btn btn-sm btn-outline-primary" title="Editar">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                            onclick="confirmDelete(<?php echo $user['id_usuario']; ?>, '<?php echo htmlspecialchars($user['nombre'] . ' ' . $user['apellido']); ?>')"
+                                                            title="Eliminar">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else: ?>
+                        <div class="text-center py-5">
+                            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No se encontraron usuarios</h5>
+                            <p class="text-muted">No hay usuarios que coincidan con los criterios de búsqueda.</p>
+                            <a href="index.php?action=admin/usuarios/create" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Crear Primer Usuario
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Paginación -->
+                <?php if ($totalPages > 1): ?>
+                    <div class="card-footer bg-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <small class="text-muted">
+                                    Mostrando <?php echo (($page - 1) * $limit) + 1; ?> - 
+                                    <?php echo min($page * $limit, $totalUsers); ?> de <?php echo $totalUsers; ?> usuarios
+                                </small>
+                            </div>
+                            <nav>
+                                <ul class="pagination pagination-sm mb-0">
+                                    <?php if ($page > 1): ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?action=admin/usuarios&page=<?php echo $page - 1; ?>&search=<?php echo urlencode($search); ?>&role_filter=<?php echo $roleFilter; ?>">
+                                                <i class="fas fa-chevron-left"></i>
+                                            </a>
+                                        </li>
+                                    <?php endif; ?>
+
+                                    <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                                        <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
+                                            <a class="page-link" href="?action=admin/usuarios&page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&role_filter=<?php echo $roleFilter; ?>">
+                                                <?php echo $i; ?>
+                                            </a>
+                                        </li>
+                                    <?php endfor; ?>
+
+                                    <?php if ($page < $totalPages): ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?action=admin/usuarios&page=<?php echo $page + 1; ?>&search=<?php echo urlencode($search); ?>&role_filter=<?php echo $roleFilter; ?>">
+                                                <i class="fas fa-chevron-right"></i>
+                                            </a>
+                                        </li>
+                                    <?php endif; ?>
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmación de eliminación -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro que desea eliminar al usuario <strong id="userName"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Nota:</strong> Esta acción desactivará el usuario pero no eliminará sus datos permanentemente.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <form method="POST" style="display: inline;">
+                    <input type="hidden" name="user_id" id="userIdToDelete">
+                    <button type="submit" name="delete_user" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Eliminar Usuario
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .avatar-sm {
+        width: 35px;
+        height: 35px;
+        font-size: 14px;
+    }
+    .table th {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #495057;
+    }
+    .btn-group .btn {
+        margin-right: 2px;
+    }
+    .btn-group .btn:last-child {
+        margin-right: 0;
+    }
+</style>
+
+<script>
+    function confirmDelete(userId, userName) {
+        document.getElementById('userName').textContent = userName;
+        document.getElementById('userIdToDelete').value = userId;
+        new bootstrap.Modal(document.getElementById('deleteModal')).show();
+    }
+</script>
+
+</body>
+</html>
