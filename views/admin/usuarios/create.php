@@ -25,27 +25,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data = [
             'username' => trim($_POST['username']),
             'email' => trim($_POST['email']),
-            'password' => trim($_POST['password']),
-            'cedula' => trim($_POST['cedula']) ?: null,
+            // 'password' => trim($_POST['password']),  ← COMENTADA O ELIMINADA
+            'cedula' => trim($_POST['cedula'] ?? '') ?: null, // ← Agregar ?? ''
             'nombre' => trim($_POST['nombre']),
             'apellido' => trim($_POST['apellido']),
             'fecha_nacimiento' => $_POST['fecha_nacimiento'] ?: null,
             'genero' => $_POST['genero'] ?: null,
-            'telefono' => trim($_POST['telefono']) ?: null,
-            'direccion' => trim($_POST['direccion']) ?: null,
+            'telefono' => trim($_POST['telefono'] ?? '') ?: null, // ← Agregar ?? ''
+            'direccion' => trim($_POST['direccion'] ?? '') ?: null, // ← Agregar ?? ''
             'id_rol' => $_POST['id_rol'],
             'id_sucursal' => $_POST['id_sucursal'] ?: null,
             'especialidades' => $_POST['especialidades'] ?? []
         ];
 
         // Validaciones básicas
-        if (empty($data['username']) || empty($data['email']) || empty($data['password']) ||
+        if (empty($data['username']) || empty($data['email']) ||
                 empty($data['nombre']) || empty($data['apellido']) || empty($data['id_rol'])) {
             throw new Exception("Por favor complete todos los campos obligatorios");
-        }
-
-        if (strlen($data['password']) < 6) {
-            throw new Exception("La contraseña debe tener al menos 6 caracteres");
         }
 
         if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
@@ -200,21 +196,17 @@ include 'views/includes/navbar.php';
                                                        value="<?php echo $_POST['email'] ?? ''; ?>" required>
                                             </div>
                                         </div>
+
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label class="form-label">Contraseña <span class="text-danger">*</span></label>
-                                                <input type="password" class="form-control" name="password" 
-                                                       minlength="6" required>
-                                                <div class="form-text">Mínimo 6 caracteres</div>
+                                                <div class="alert alert-info">
+                                                    <i class="fas fa-envelope"></i>
+                                                    <strong>Contraseña automática:</strong><br>
+                                                    Se generará una contraseña temporal y se enviará por email al usuario.
+                                                </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">Cédula</label>
-                                                <input type="text" class="form-control" name="cedula" 
-                                                       value="<?php echo $_POST['cedula'] ?? ''; ?>">
-                                            </div>
-                                        </div>
+
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label class="form-label">Nombre <span class="text-danger">*</span></label>

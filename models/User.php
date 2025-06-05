@@ -1,6 +1,7 @@
 <?php
 
 require_once 'config/database.php';
+require_once 'includes/password-generator.php';
 
 class User {
 
@@ -132,6 +133,7 @@ class User {
     }
 
     // Crear nuevo usuario
+    // Crear nuevo usuario
     public function createUser($data) {
         try {
             $this->db->beginTransaction();
@@ -149,22 +151,25 @@ class User {
                 throw new Exception("La cédula ya existe");
             }
 
+            // Generar contraseña temporal automática
+            $passwordTemporal = generarPasswordTemporal(8);
+
             // Insertar usuario
             $sql = "INSERT INTO usuarios (
-            username, email, password, cedula, nombre, apellido, 
-            fecha_nacimiento, genero, telefono, direccion, 
-            id_rol, id_sucursal, requiere_cambio_contrasena
-        ) VALUES (
-            :username, :email, :password, :cedula, :nombre, :apellido, 
-            :fecha_nacimiento, :genero, :telefono, :direccion, 
-            :id_rol, :id_sucursal, :requiere_cambio_contrasena
-        )";
+                    username, email, password, cedula, nombre, apellido, 
+                    fecha_nacimiento, genero, telefono, direccion, 
+                    id_rol, id_sucursal, requiere_cambio_contrasena, clave_temporal
+                ) VALUES (
+                    :username, :email, :password, :cedula, :nombre, :apellido, 
+                    :fecha_nacimiento, :genero, :telefono, :direccion, 
+                    :id_rol, :id_sucursal, 1, :clave_temporal
+                )";
 
             $stmt = $this->db->prepare($sql);
             $result = $stmt->execute([
                 'username' => $data['username'],
                 'email' => $data['email'],
-                'password' => base64_encode($data['password']),
+                'password' => base64_encode($passwordTemporal),
                 'cedula' => $data['cedula'] ?? null,
                 'nombre' => $data['nombre'],
                 'apellido' => $data['apellido'],
@@ -174,7 +179,7 @@ class User {
                 'direccion' => $data['direccion'] ?? null,
                 'id_rol' => $data['id_rol'],
                 'id_sucursal' => $data['id_sucursal'] ?? null,
-                'requiere_cambio_contrasena' => 1
+                'clave_temporal' => $passwordTemporal
             ]);
 
             $userId = $this->db->lastInsertId();
@@ -184,8 +189,22 @@ class User {
                 $this->addMedicoEspecialidades($userId, $data['especialidades']);
             }
 
+            // Enviar email con credenciales
+            $nombreCompleto = $data['nombre'] . ' ' . $data['apellido'];
+            $emailEnviado = enviarCredencialesPorEmail(
+                    $data['email'],
+                    $data['username'],
+                    $passwordTemporal,
+                    $nombreCompleto
+            );
+
             $this->db->commit();
-            return $userId;
+
+            return [
+                'user_id' => $userId,
+                'password_temporal' => $passwordTemporal,
+                'email_enviado' => $emailEnviado
+            ];
         } catch (Exception $e) {
             $this->db->rollback();
             throw $e;
