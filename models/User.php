@@ -375,6 +375,69 @@ class User {
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['id' => $userId]);
     }
+    
+    // Actualizar solo datos de perfil (sin rol ni sucursal)
+    public function updateUserProfile($id, $data) {
+        try {
+            $this->db->beginTransaction();
+            
+            // Verificar unicidad (excluyendo el usuario actual)
+            if ($this->usernameExists($data['username'], $id)) {
+                throw new Exception("El nombre de usuario ya existe");
+            }
+            
+            if ($this->emailExists($data['email'], $id)) {
+                throw new Exception("El email ya existe");
+            }
+            
+            if (!empty($data['cedula']) && $this->cedulaExists($data['cedula'], $id)) {
+                throw new Exception("La cédula ya existe");
+            }
+            
+            $sql = "UPDATE usuarios SET 
+                    username = :username, 
+                    email = :email, 
+                    nombre = :nombre, 
+                    apellido = :apellido, 
+                    fecha_nacimiento = :fecha_nacimiento, 
+                    genero = :genero, 
+                    telefono = :telefono, 
+                    direccion = :direccion,
+                    cedula = :cedula
+                    WHERE id_usuario = :id";
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
+                'username' => $data['username'],
+                'email' => $data['email'],
+                'nombre' => $data['nombre'],
+                'apellido' => $data['apellido'],
+                'fecha_nacimiento' => $data['fecha_nacimiento'],
+                'genero' => $data['genero'],
+                'telefono' => $data['telefono'],
+                'direccion' => $data['direccion'],
+                'cedula' => $data['cedula'],
+                'id' => $id
+            ]);
+            
+            $this->db->commit();
+            return true;
+            
+        } catch (Exception $e) {
+            $this->db->rollback();
+            throw $e;
+        }
+    }
+    
+    // Cambiar contraseña sin requerir cambio forzado
+    public function changeUserPassword($userId, $newPassword) {
+        $sql = "UPDATE usuarios SET password = :password WHERE id_usuario = :id";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([
+            'password' => base64_encode($newPassword),
+            'id' => $userId
+        ]);
+    }
 }
 
 ?>
