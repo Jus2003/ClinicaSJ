@@ -153,9 +153,6 @@ include 'views/includes/navbar.php';
             </div>
         </div>
     </div>
-
-    <!-- Agregar este HTML antes del </div> final del container -->
-
     <!-- Modal de Agendamiento -->
     <div class="modal fade" id="modalAgendamiento" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-xl">
@@ -272,14 +269,12 @@ include 'views/includes/navbar.php';
                                         <label class="form-label">Médico Disponible</label>
                                         <select class="form-select" id="medicoSeleccionado" name="id_medico" required>
                                             <option value="">Seleccione un médico...</option>
-                                            <!-- Los médicos se cargan dinámicamente -->
                                         </select>
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">Horario Disponible</label>
                                         <select class="form-select" id="horaSeleccionada" name="hora_cita" required>
                                             <option value="">Primero seleccione un médico</option>
-                                            <!-- Los horarios se cargan dinámicamente -->
                                         </select>
                                     </div>
                                 </div>
@@ -336,19 +331,19 @@ include 'views/includes/navbar.php';
                                         <label class="form-label">Nombre <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control" name="nombre_paciente" 
                                                id="nombrePaciente" required
-                                               value="<?php echo $_SESSION['role_id'] == 4 ? htmlspecialchars($datosUsuario['nombre']) : ''; ?>">
+                                               value="<?php echo $_SESSION['role_id'] == 4 ? htmlspecialchars($datosUsuario['nombre'] ?? '') : ''; ?>">
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">Apellido <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control" name="apellido_paciente" 
                                                id="apellidoPaciente" required
-                                               value="<?php echo $_SESSION['role_id'] == 4 ? htmlspecialchars($datosUsuario['apellido']) : ''; ?>">
+                                               value="<?php echo $_SESSION['role_id'] == 4 ? htmlspecialchars($datosUsuario['apellido'] ?? '') : ''; ?>">
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">Email <span class="text-danger">*</span></label>
                                         <input type="email" class="form-control" name="email_paciente" 
                                                id="emailPaciente" required
-                                               value="<?php echo $_SESSION['role_id'] == 4 ? htmlspecialchars($datosUsuario['email']) : ''; ?>">
+                                               value="<?php echo $_SESSION['role_id'] == 4 ? htmlspecialchars($datosUsuario['email'] ?? '') : ''; ?>">
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">Teléfono</label>
@@ -369,7 +364,6 @@ include 'views/includes/navbar.php';
                                 </div>
 
                                 <?php if ($_SESSION['role_id'] == 4): ?>
-                                    <!-- Campo oculto con ID del paciente si está logueado -->
                                     <input type="hidden" name="id_paciente" value="<?php echo $_SESSION['user_id']; ?>">
                                 <?php else: ?>
                                     <input type="hidden" name="id_paciente" id="idPacienteSeleccionado">
@@ -504,21 +498,6 @@ include 'views/includes/navbar.php';
         border: 2px solid #007bff;
     }
 
-    /* Responsive */
-    @media (max-width: 768px) {
-        .calendar-table td {
-            height: 45px;
-            font-size: 14px;
-        }
-
-        .calendar-table th {
-            padding: 10px 4px;
-            font-size: 12px;
-        }
-    }
-
-    /* Agregar al final de la etiqueta <style> existente */
-
     /* Estilos del modal */
     .modal-xl {
         max-width: 1200px;
@@ -639,8 +618,18 @@ include 'views/includes/navbar.php';
         transform: translateX(0);
     }
 
-    /* Responsive para modal */
+    /* Responsive */
     @media (max-width: 768px) {
+        .calendar-table td {
+            height: 45px;
+            font-size: 14px;
+        }
+
+        .calendar-table th {
+            padding: 10px 4px;
+            font-size: 12px;
+        }
+
         .modal-xl {
             max-width: 95%;
             margin: 10px auto;
@@ -669,17 +658,38 @@ include 'views/includes/navbar.php';
     let mesActual = fechaActual.getMonth();
     let anioActual = fechaActual.getFullYear();
 
+    // Variables del modal
+    let pasoActual = 1;
+    const totalPasos = 6;
+    let datosFormulario = {
+        fecha_cita: null,
+        tipo_cita: null,
+        id_especialidad: null,
+        id_sucursal: null,
+        id_medico: null,
+        hora_cita: null
+    };
+
+    // Datos de especialidades y sucursales (se cargan desde PHP)
+    const especialidades = <?php echo json_encode($especialidades); ?>;
+    const sucursales = <?php echo json_encode($sucursales); ?>;
+    const esUsuarioPaciente = <?php echo $_SESSION['role_id'] == 4 ? 'true' : 'false'; ?>;
+
     // Nombres de meses
     const nombresMeses = [
         'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
 
-    // Inicializar calendario al cargar la página
+    // Inicializar al cargar la página
     document.addEventListener('DOMContentLoaded', function () {
         generarCalendario(mesActual, anioActual);
+        inicializarEventListeners();
+    });
 
-        // Event listeners para navegación del calendario
+    // Event listeners
+    function inicializarEventListeners() {
+        // Navegación del calendario
         document.getElementById('btnMesAnterior').addEventListener('click', function () {
             if (mesActual === 0) {
                 mesActual = 11;
@@ -699,7 +709,27 @@ include 'views/includes/navbar.php';
             }
             generarCalendario(mesActual, anioActual);
         });
-    });
+
+        // Botones del modal
+        document.getElementById('btnSiguiente').addEventListener('click', function () {
+            if (validarPasoActual()) {
+                siguientePaso();
+            }
+        });
+
+        document.getElementById('btnAnterior').addEventListener('click', function () {
+            anteriorPaso();
+        });
+
+        document.getElementById('btnConfirmar').addEventListener('click', function () {
+            confirmarCita();
+        });
+
+        // Reset al cerrar modal
+        document.getElementById('modalAgendamiento').addEventListener('hidden.bs.modal', function () {
+            resetearModal();
+        });
+    }
 
     // Función para generar el calendario
     function generarCalendario(mes, anio) {
@@ -750,9 +780,12 @@ include 'views/includes/navbar.php';
                     } else {
                         // Fechas futuras - disponibles
                         celda.classList.add('available');
-                        celda.addEventListener('click', function () {
-                            seleccionarFecha(anio, mes, fecha);
-                        });
+                        // Crear closure para capturar la fecha correcta
+                        (function (anio, mes, dia) {
+                            celda.addEventListener('click', function () {
+                                seleccionarFecha(anio, mes, dia);
+                            });
+                        })(anio, mes, fecha);
                     }
 
                     // Marcar día actual
@@ -775,8 +808,7 @@ include 'views/includes/navbar.php';
         }
     }
 
-    // Función para seleccionar fecha
-    // Corregir la función seleccionarFecha
+    // Función para seleccionar fecha (CORREGIDA)
     function seleccionarFecha(anio, mes, dia) {
         // Remover selección anterior
         const celdaAnterior = document.querySelector('.calendar-table td.selected');
@@ -792,15 +824,15 @@ include 'views/includes/navbar.php';
             }
         });
 
-        // Guardar fecha seleccionada
+        // Guardar fecha seleccionada (CORREGIDO)
         fechaSeleccionada = new Date(anio, mes, dia);
         datosFormulario.fecha_cita = fechaSeleccionada;
 
-        // CORRECCIÓN: El mes en JavaScript ya está en formato 0-11, no sumar 1
+        // Formatear fecha para mostrar (CORREGIDO)
         const fechaFormateada = `${dia}/${mes + 1}/${anio}`;
         document.getElementById('fechaModalTitulo').textContent = fechaFormateada;
 
-        // CORRECCIÓN: Formatear fecha correctamente para MySQL
+        // Formatear fecha para MySQL (CORREGIDO)
         const mesFormatted = String(mes + 1).padStart(2, '0');
         const diaFormatted = String(dia).padStart(2, '0');
         document.getElementById('fechaCita').value = `${anio}-${mesFormatted}-${diaFormatted}`;
@@ -832,54 +864,7 @@ include 'views/includes/navbar.php';
         }, 5000);
     }
 
-
-    let pasoActual = 1;
-    const totalPasos = 6;
-    let datosFormulario = {
-        fecha_cita: null,
-        tipo_cita: null,
-        id_especialidad: null,
-        id_sucursal: null,
-        id_medico: null,
-        hora_cita: null
-    };
-
-// Datos de especialidades y sucursales (se cargan desde PHP)
-    const especialidades = <?php echo json_encode($especialidades); ?>;
-    const sucursales = <?php echo json_encode($sucursales); ?>;
-    const esUsuarioPaciente = <?php echo $_SESSION['role_id'] == 4 ? 'true' : 'false'; ?>;
-
-// Modificar la función seleccionarFecha existente
-    function seleccionarFecha(anio, mes, dia) {
-// Remover selección anterior
-        const celdaAnterior = document.querySelector('.calendar-table td.selected');
-        if (celdaAnterior) {
-            celdaAnterior.classList.remove('selected');
-        }
-
-// Seleccionar nueva fecha
-        const celdas = document.querySelectorAll('.calendar-table td.available');
-        celdas.forEach(celda => {
-            if (celda.textContent == dia && !celda.classList.contains('other-month')) {
-                celda.classList.add('selected');
-            }
-        });
-
-// Guardar fecha seleccionada
-        fechaSeleccionada = new Date(anio, mes, dia);
-        datosFormulario.fecha_cita = fechaSeleccionada;
-
-// Formatear fecha para mostrar
-        const fechaFormateada = `${dia}/${mes + 1}/${anio}`;
-        document.getElementById('fechaModalTitulo').textContent = fechaFormateada;
-        document.getElementById('fechaCita').value = `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-
-// Mostrar mensaje y abrir modal
-        mostrarMensaje('success', `Fecha seleccionada: ${fechaFormateada}`);
-        abrirModalAgendamiento();
-    }
-
-// Función para abrir el modal
+    // Función para abrir el modal
     function abrirModalAgendamiento() {
         pasoActual = 1;
         actualizarIndicadorPasos();
@@ -890,45 +875,20 @@ include 'views/includes/navbar.php';
         modal.show();
     }
 
-// Event listeners para botones del modal
-    document.addEventListener('DOMContentLoaded', function () {
-// Botón Siguiente
-        document.getElementById('btnSiguiente').addEventListener('click', function () {
-            if (validarPasoActual()) {
-                siguientePaso();
-            }
-        });
-
-// Botón Anterior
-        document.getElementById('btnAnterior').addEventListener('click', function () {
-            anteriorPaso();
-        });
-
-// Botón Confirmar
-        document.getElementById('btnConfirmar').addEventListener('click', function () {
-            confirmarCita();
-        });
-
-// Reset al cerrar modal
-        document.getElementById('modalAgendamiento').addEventListener('hidden.bs.modal', function () {
-            resetearModal();
-        });
-    });
-
-// Función para mostrar un paso específico
+    // Función para mostrar un paso específico
     function mostrarPaso(numeroPaso) {
-// Ocultar todos los pasos
+        // Ocultar todos los pasos
         document.querySelectorAll('.paso-container').forEach(paso => {
             paso.classList.add('d-none');
         });
 
-// Mostrar paso actual
+        // Mostrar paso actual
         document.getElementById(`paso${numeroPaso}`).classList.remove('d-none');
 
-// Actualizar botones
+        // Actualizar botones
         actualizarBotones();
 
-// Cargar contenido específico del paso
+        // Cargar contenido específico del paso
         switch (numeroPaso) {
             case 2:
                 cargarEspecialidades();
@@ -945,7 +905,7 @@ include 'views/includes/navbar.php';
         }
     }
 
-// Función para actualizar el indicador de pasos
+    // Función para actualizar el indicador de pasos
     function actualizarIndicadorPasos() {
         for (let i = 1; i <= totalPasos; i++) {
             const step = document.getElementById(`step${i}`);
@@ -959,16 +919,16 @@ include 'views/includes/navbar.php';
         }
     }
 
-// Función para actualizar botones
+    // Función para actualizar botones
     function actualizarBotones() {
         const btnAnterior = document.getElementById('btnAnterior');
         const btnSiguiente = document.getElementById('btnSiguiente');
         const btnConfirmar = document.getElementById('btnConfirmar');
 
-// Botón Anterior
+        // Botón Anterior
         btnAnterior.style.display = pasoActual > 1 ? 'inline-block' : 'none';
 
-// Botón Siguiente
+        // Botón Siguiente/Confirmar
         if (pasoActual < totalPasos) {
             btnSiguiente.style.display = 'inline-block';
             btnConfirmar.classList.add('d-none');
@@ -978,7 +938,7 @@ include 'views/includes/navbar.php';
         }
     }
 
-// Función para ir al siguiente paso
+    // Función para ir al siguiente paso
     function siguientePaso() {
         if (pasoActual < totalPasos) {
             pasoActual++;
@@ -987,7 +947,7 @@ include 'views/includes/navbar.php';
         }
     }
 
-// Función para ir al paso anterior
+    // Función para ir al paso anterior
     function anteriorPaso() {
         if (pasoActual > 1) {
             pasoActual--;
@@ -996,16 +956,39 @@ include 'views/includes/navbar.php';
         }
     }
 
-// Función para cargar tipos de cita
+    // Función para resetear el modal
+    function resetearModal() {
+        pasoActual = 1;
+        datosFormulario = {
+            fecha_cita: null,
+            tipo_cita: null,
+            id_especialidad: null,
+            id_sucursal: null,
+            id_medico: null,
+            hora_cita: null
+        };
+
+        // Limpiar formulario
+        document.getElementById('formAgendamiento').reset();
+
+        // Remover selecciones
+        document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+
+        // Resetear pasos
+        actualizarIndicadorPasos();
+        mostrarPaso(1);
+    }
+
+    // Función para cargar tipos de cita
     function cargarTiposCita() {
         const cards = document.querySelectorAll('.tipo-cita-card');
 
         cards.forEach(card => {
             card.addEventListener('click', function () {
-// Remover selección anterior
+                // Remover selección anterior
                 cards.forEach(c => c.classList.remove('selected'));
 
-// Seleccionar nueva opción
+                // Seleccionar nueva opción
                 this.classList.add('selected');
 
                 const tipo = this.getAttribute('data-tipo');
@@ -1017,13 +1000,13 @@ include 'views/includes/navbar.php';
         });
     }
 
-// Función para cargar especialidades
+    // Función para cargar especialidades
     function cargarEspecialidades() {
         const container = document.getElementById('especialidadesContainer');
         container.innerHTML = '';
 
         especialidades.forEach(esp => {
-// Verificar si la especialidad permite el tipo de cita seleccionado
+            // Verificar si la especialidad permite el tipo de cita seleccionado
             const permiteVirtual = esp.permite_virtual == 1;
             const permitePresencial = esp.permite_presencial == 1;
             const tipoSeleccionado = datosFormulario.tipo_cita;
@@ -1035,28 +1018,28 @@ include 'views/includes/navbar.php';
             col.className = 'col-md-6 col-lg-4 mb-3';
 
             col.innerHTML = `
-<div class="card especialidad-card ${disponible ? '' : 'disabled'}" 
-     data-especialidad="${esp.id_especialidad}">
-    <div class="card-body text-center p-3">
-        <i class="fas fa-user-md fa-2x text-primary mb-2"></i>
-        <h6>${esp.nombre_especialidad}</h6>
-        <small class="text-muted">${esp.descripcion || 'Atención especializada'}</small>
-        ${!disponible ? '<br><small class="text-danger">No disponible para cita ' + tipoSeleccionado + '</small>' : ''}
-    </div>
-</div>
-`;
+                <div class="card especialidad-card ${disponible ? '' : 'disabled'}" 
+                     data-especialidad="${esp.id_especialidad}">
+                    <div class="card-body text-center p-3">
+                        <i class="fas fa-user-md fa-2x text-primary mb-2"></i>
+                        <h6>${esp.nombre_especialidad}</h6>
+                        <small class="text-muted">${esp.descripcion || 'Atención especializada'}</small>
+                        ${!disponible ? '<br><small class="text-danger">No disponible para cita ' + tipoSeleccionado + '</small>' : ''}
+                    </div>
+                </div>
+            `;
 
             container.appendChild(col);
 
-// Agregar event listener solo si está disponible
+            // Agregar event listener solo si está disponible
             if (disponible) {
                 const card = col.querySelector('.especialidad-card');
                 card.addEventListener('click', function () {
-// Remover selección anterior
+                    // Remover selección anterior
                     document.querySelectorAll('.especialidad-card').forEach(c =>
                         c.classList.remove('selected'));
 
-// Seleccionar nueva opción
+                    // Seleccionar nueva opción
                     this.classList.add('selected');
 
                     const idEspecialidad = this.getAttribute('data-especialidad');
@@ -1069,38 +1052,37 @@ include 'views/includes/navbar.php';
         });
     }
 
-// Función para cargar sucursales
+    // Función para cargar sucursales
     function cargarSucursales() {
         const container = document.getElementById('sucursalesContainer');
         container.innerHTML = '';
 
-// Aquí podrías filtrar sucursales que tengan la especialidad seleccionada
         sucursales.forEach(suc => {
             const col = document.createElement('div');
             col.className = 'col-md-6 mb-3';
 
             col.innerHTML = `
-<div class="card sucursal-card" data-sucursal="${suc.id_sucursal}">
-    <div class="card-body p-3">
-        <h6><i class="fas fa-building text-primary me-2"></i>${suc.nombre_sucursal}</h6>
-        <p class="text-muted small mb-2">${suc.direccion}</p>
-        <p class="mb-0">
-            <small><i class="fas fa-phone me-1"></i>${suc.telefono || 'N/A'}</small>
-            ${suc.email ? `<br><small><i class="fas fa-envelope me-1"></i>${suc.email}</small>` : ''}
-        </p>
-    </div>
-</div>
-`;
+                <div class="card sucursal-card" data-sucursal="${suc.id_sucursal}">
+                    <div class="card-body p-3">
+                        <h6><i class="fas fa-building text-primary me-2"></i>${suc.nombre_sucursal}</h6>
+                        <p class="text-muted small mb-2">${suc.direccion}</p>
+                        <p class="mb-0">
+                            <small><i class="fas fa-phone me-1"></i>${suc.telefono || 'N/A'}</small>
+                            ${suc.email ? `<br><small><i class="fas fa-envelope me-1"></i>${suc.email}</small>` : ''}
+                        </p>
+                    </div>
+                </div>
+            `;
 
             container.appendChild(col);
 
             const card = col.querySelector('.sucursal-card');
             card.addEventListener('click', function () {
-// Remover selección anterior
+                // Remover selección anterior
                 document.querySelectorAll('.sucursal-card').forEach(c =>
                     c.classList.remove('selected'));
 
-// Seleccionar nueva opción
+                // Seleccionar nueva opción
                 this.classList.add('selected');
 
                 const idSucursal = this.getAttribute('data-sucursal');
@@ -1112,16 +1094,16 @@ include 'views/includes/navbar.php';
         });
     }
 
-// Función para cargar médicos y horarios
+    // Función para cargar médicos y horarios
     function cargarMedicosYHorarios() {
         const selectMedico = document.getElementById('medicoSeleccionado');
         const selectHora = document.getElementById('horaSeleccionada');
 
-// Limpiar selects
+        // Limpiar selects
         selectMedico.innerHTML = '<option value="">Cargando médicos...</option>';
         selectHora.innerHTML = '<option value="">Primero seleccione un médico</option>';
 
-// Hacer petición AJAX para obtener médicos disponibles
+        // Hacer petición AJAX para obtener médicos disponibles
         const params = new URLSearchParams({
             especialidad: datosFormulario.id_especialidad,
             sucursal: datosFormulario.id_sucursal,
@@ -1131,6 +1113,7 @@ include 'views/includes/navbar.php';
         fetch(`views/api/obtener-medicos.php?${params}`)
                 .then(response => response.json())
                 .then(data => {
+                    console.log('Respuesta médicos:', data);
                     selectMedico.innerHTML = '<option value="">Seleccione un médico...</option>';
 
                     if (data.success && data.medicos.length > 0) {
@@ -1142,6 +1125,7 @@ include 'views/includes/navbar.php';
                         });
                     } else {
                         selectMedico.innerHTML = '<option value="">No hay médicos disponibles</option>';
+                        console.log('Debug médicos:', data.debug);
                     }
                 })
                 .catch(error => {
@@ -1149,28 +1133,36 @@ include 'views/includes/navbar.php';
                     selectMedico.innerHTML = '<option value="">Error al cargar médicos</option>';
                 });
 
-// Event listener para cambio de médico
-        selectMedico.addEventListener('change', function () {
-            const medicoId = this.value;
-            datosFormulario.id_medico = medicoId;
+        // Event listener para cambio de médico (solo agregar una vez)
+        selectMedico.removeEventListener('change', manejarCambioMedico);
+        selectMedico.addEventListener('change', manejarCambioMedico);
 
-            if (medicoId) {
-                cargarHorariosDisponibles(medicoId);
-                mostrarInfoMedico(medicoId);
-            } else {
-                selectHora.innerHTML = '<option value="">Primero seleccione un médico</option>';
-                document.getElementById('medicoInfo').classList.add('d-none');
-            }
-        });
-
-// Event listener para cambio de hora
-        selectHora.addEventListener('change', function () {
-            datosFormulario.hora_cita = this.value;
-            console.log('Hora seleccionada:', this.value);
-        });
+        // Event listener para cambio de hora (solo agregar una vez)
+        selectHora.removeEventListener('change', manejarCambioHora);
+        selectHora.addEventListener('change', manejarCambioHora);
     }
 
-// Función para cargar horarios disponibles
+    // Función separada para manejar cambio de médico
+    function manejarCambioMedico() {
+        const medicoId = this.value;
+        datosFormulario.id_medico = medicoId;
+
+        if (medicoId) {
+            cargarHorariosDisponibles(medicoId);
+            mostrarInfoMedico(medicoId);
+        } else {
+            document.getElementById('horaSeleccionada').innerHTML = '<option value="">Primero seleccione un médico</option>';
+            document.getElementById('medicoInfo').classList.add('d-none');
+        }
+    }
+
+    // Función separada para manejar cambio de hora
+    function manejarCambioHora() {
+        datosFormulario.hora_cita = this.value;
+        console.log('Hora seleccionada:', this.value);
+    }
+
+    // Función para cargar horarios disponibles
     function cargarHorariosDisponibles(medicoId) {
         const selectHora = document.getElementById('horaSeleccionada');
         selectHora.innerHTML = '<option value="">Cargando horarios...</option>';
@@ -1184,6 +1176,7 @@ include 'views/includes/navbar.php';
         fetch(`views/api/obtener-horarios.php?${params}`)
                 .then(response => response.json())
                 .then(data => {
+                    console.log('Respuesta horarios:', data);
                     selectHora.innerHTML = '<option value="">Seleccione un horario...</option>';
 
                     if (data.success && data.horarios.length > 0) {
@@ -1195,6 +1188,7 @@ include 'views/includes/navbar.php';
                         });
                     } else {
                         selectHora.innerHTML = '<option value="">No hay horarios disponibles</option>';
+                        console.log('Debug horarios:', data.debug);
                     }
                 })
                 .catch(error => {
@@ -1203,19 +1197,17 @@ include 'views/includes/navbar.php';
                 });
     }
 
-// Función para mostrar información del médico
+    // Función para mostrar información del médico
     function mostrarInfoMedico(medicoId) {
-// Aquí podrías hacer una petición para obtener más info del médico
-// Por ahora solo mostramos el div
         const medicoInfo = document.getElementById('medicoInfo');
         medicoInfo.innerHTML = `
-<h6><i class="fas fa-info-circle"></i> Información del médico</h6>
-<p class="mb-0">Médico seleccionado. Cargando información adicional...</p>
-`;
+            <h6><i class="fas fa-info-circle"></i> Información del médico</h6>
+            <p class="mb-0">Médico seleccionado. Los horarios disponibles se están cargando...</p>
+        `;
         medicoInfo.classList.remove('d-none');
     }
 
-// Función para validar el paso actual
+    // Función para validar el paso actual
     function validarPasoActual() {
         switch (pasoActual) {
             case 1:
@@ -1243,7 +1235,7 @@ include 'views/includes/navbar.php';
                 }
                 break;
             case 5:
-// Validar campos del formulario de paciente
+                // Validar campos del formulario de paciente
                 const form = document.getElementById('formAgendamiento');
                 const formData = new FormData(form);
 
@@ -1253,7 +1245,7 @@ include 'views/includes/navbar.php';
                     return false;
                 }
 
-// Validar email
+                // Validar email
                 const email = formData.get('email_paciente');
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 if (!emailRegex.test(email)) {
@@ -1265,44 +1257,6 @@ include 'views/includes/navbar.php';
         return true;
     }
 
-// Función para resetear el modal
-    function resetearModal() {
-        pasoActual = 1;
-        datosFormulario = {
-            fecha_cita: null,
-            tipo_cita: null,
-            id_especialidad: null,
-            id_sucursal: null,
-            id_medico: null,
-            hora_cita: null
-        };
-
-// Limpiar formulario
-        document.getElementById('formAgendamiento').reset();
-
-// Remover selecciones
-        document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
-
-// Resetear pasos
-        actualizarIndicadorPasos();
-        mostrarPaso(1);
-    }
-
-// Función para generar resumen (implementaremos en la siguiente parte)
-    function generarResumen() {
-        console.log('Generando resumen...', datosFormulario);
-// Implementaremos esto en la siguiente parte
-    }
-
-// Función para confirmar cita (implementaremos en la siguiente parte)
-    function confirmarCita() {
-        console.log('Confirmando cita...', datosFormulario);
-// Implementaremos esto en la siguiente parte
-    }
-
-    // Agregar estas funciones al JavaScript existente
-
-// Función para buscar paciente existente
     function buscarPacienteExistente() {
         const criterio = prompt('Ingrese cédula, nombre, apellido o email del paciente:');
 
@@ -1342,59 +1296,59 @@ include 'views/includes/navbar.php';
                 });
     }
 
-// Función para mostrar modal de selección de paciente
+    // Función para mostrar modal de selección de paciente
     function mostrarModalSeleccionPaciente(pacientes) {
         // Crear modal dinámicamente
         const modalHtml = `
-        <div class="modal fade" id="modalSeleccionPaciente" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-search"></i> Seleccionar Paciente
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Nombre</th>
-                                        <th>Cédula</th>
-                                        <th>Email</th>
-                                        <th>Teléfono</th>
-                                        <th>Acción</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${pacientes.map(paciente => `
-                                        <tr>
-                                            <td>${paciente.nombre_completo}</td>
-                                            <td>${paciente.cedula || 'N/A'}</td>
-                                            <td>${paciente.email}</td>
-                                            <td>${paciente.telefono || 'N/A'}</td>
-                                            <td>
-                                                <button type="button" class="btn btn-sm btn-primary" 
-                                                        onclick="seleccionarPaciente(${paciente.id_usuario}, '${paciente.nombre_completo}', ${JSON.stringify(paciente.datos_completos).replace(/"/g, '&quot;')})">
-                                                    <i class="fas fa-check"></i> Seleccionar
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
+            <div class="modal fade" id="modalSeleccionPaciente" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-search"></i> Seleccionar Paciente
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                            Cancelar
-                        </button>
+                        <div class="modal-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Nombre</th>
+                                            <th>Cédula</th>
+                                            <th>Email</th>
+                                            <th>Teléfono</th>
+                                            <th>Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${pacientes.map(paciente => `
+                                            <tr>
+                                                <td>${paciente.nombre_completo}</td>
+                                                <td>${paciente.cedula || 'N/A'}</td>
+                                                <td>${paciente.email}</td>
+                                                <td>${paciente.telefono || 'N/A'}</td>
+                                                <td>
+                                                    <button type="button" class="btn btn-sm btn-primary" 
+                                                            onclick="seleccionarPaciente(${paciente.id_usuario}, '${paciente.nombre_completo}', ${JSON.stringify(paciente.datos_completos).replace(/"/g, '&quot;')})">
+                                                        <i class="fas fa-check"></i> Seleccionar
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                Cancelar
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    `;
+        `;
 
         // Remover modal anterior si existe
         const modalExistente = document.getElementById('modalSeleccionPaciente');
@@ -1410,14 +1364,20 @@ include 'views/includes/navbar.php';
         modal.show();
     }
 
-// Función para seleccionar un paciente
+    // Función para seleccionar un paciente
     function seleccionarPaciente(idPaciente, nombreCompleto, datosCompletos) {
         // Llenar campos del formulario
         document.getElementById('nombrePaciente').value = datosCompletos.nombre || '';
         document.getElementById('apellidoPaciente').value = datosCompletos.apellido || '';
         document.getElementById('emailPaciente').value = datosCompletos.email || '';
         document.getElementById('telefonoPaciente').value = datosCompletos.telefono || '';
-        document.getElementById('cedulaPaciente').value = datosCompletos.cedula || '';
+
+        // Solo llenar cédula si el campo existe (para roles que no son paciente)
+        const cedulaField = document.getElementById('cedulaPaciente');
+        if (cedulaField) {
+            cedulaField.value = datosCompletos.cedula || '';
+        }
+
         document.getElementById('idPacienteSeleccionado').value = idPaciente;
 
         // Cerrar modal
@@ -1430,15 +1390,25 @@ include 'views/includes/navbar.php';
         console.log('Paciente seleccionado:', {idPaciente, datosCompletos});
     }
 
-// Funciones para validación de cédula (reutilizar del código anterior)
+    // ===== FUNCIONES DE VALIDACIÓN DE CÉDULA =====
+
+    // Función para validar entrada de cédula
     function validarCedulaInput() {
         const cedulaInput = document.getElementById('cedulaPaciente');
         const btnConsultar = document.getElementById('btnConsultarCedula');
         const cedulaStatus = document.getElementById('cedulaStatus');
         const cedulaResult = document.getElementById('cedulaResult');
-        const cedula = cedulaInput.value.replace(/\D/g, '');
 
+        if (!cedulaInput || !btnConsultar || !cedulaStatus || !cedulaResult) {
+            return; // Los elementos no existen (usuario paciente)
+        }
+
+        const cedula = cedulaInput.value.replace(/\D/g, ''); // Solo números
+
+        // Actualizar el input solo con números
         cedulaInput.value = cedula;
+
+        // Resetear resultado anterior
         cedulaResult.style.display = 'none';
 
         if (cedula.length === 10) {
@@ -1464,6 +1434,7 @@ include 'views/includes/navbar.php';
         }
     }
 
+    // Función para validar cédula ecuatoriana
     function validarCedulaEcuatoriana(cedula) {
         if (cedula.length !== 10)
             return false;
@@ -1488,16 +1459,25 @@ include 'views/includes/navbar.php';
         return digitoVerificador === resultado;
     }
 
+    // Función para consultar cédula en API
     async function consultarCedula() {
-        const cedula = document.getElementById('cedulaPaciente').value;
+        const cedulaInput = document.getElementById('cedulaPaciente');
         const btnConsultar = document.getElementById('btnConsultarCedula');
         const cedulaResult = document.getElementById('cedulaResult');
         const nombreInput = document.getElementById('nombrePaciente');
         const apellidoInput = document.getElementById('apellidoPaciente');
 
-        if (!cedula || cedula.length !== 10)
-            return;
+        if (!cedulaInput || !btnConsultar || !cedulaResult) {
+            return; // Los elementos no existen (usuario paciente)
+        }
 
+        const cedula = cedulaInput.value;
+
+        if (!cedula || cedula.length !== 10) {
+            return;
+        }
+
+        // Mostrar loading
         btnConsultar.disabled = true;
         btnConsultar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Consultando...';
 
@@ -1512,51 +1492,131 @@ include 'views/includes/navbar.php';
 
             if (data.success) {
                 cedulaResult.innerHTML = `
-                <div class="alert alert-success alert-sm mb-0">
-                    <i class="fas fa-check-circle"></i> 
-                    <strong>Datos encontrados:</strong> ${data.nombres} ${data.apellidos}
-                </div>
-            `;
+                    <div class="alert alert-success alert-sm mb-0">
+                        <i class="fas fa-check-circle"></i> 
+                        <strong>Datos encontrados:</strong> ${data.nombres} ${data.apellidos}
+                    </div>
+                `;
                 cedulaResult.style.display = 'block';
 
-                if (data.nombres) {
+                // Completar campos automáticamente
+                if (data.nombres && nombreInput) {
                     nombreInput.value = data.nombres;
                     nombreInput.classList.add('is-valid');
                 }
-                if (data.apellidos) {
+                if (data.apellidos && apellidoInput) {
                     apellidoInput.value = data.apellidos;
                     apellidoInput.classList.add('is-valid');
                 }
 
+                // Highlight de los campos completados
                 setTimeout(() => {
-                    nombreInput.classList.remove('is-valid');
-                    apellidoInput.classList.remove('is-valid');
+                    if (nombreInput)
+                        nombreInput.classList.remove('is-valid');
+                    if (apellidoInput)
+                        apellidoInput.classList.remove('is-valid');
                 }, 3000);
 
             } else {
                 cedulaResult.innerHTML = `
-                <div class="alert alert-warning alert-sm mb-0">
-                    <i class="fas fa-exclamation-triangle"></i> 
-                    ${data.error || 'No se encontraron datos para esta cédula'}
-                </div>
-            `;
+                    <div class="alert alert-warning alert-sm mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        ${data.error || 'No se encontraron datos para esta cédula'}
+                    </div>
+                `;
                 cedulaResult.style.display = 'block';
             }
 
         } catch (error) {
+            console.error('Error:', error);
             cedulaResult.innerHTML = `
-            <div class="alert alert-danger alert-sm mb-0">
-                <i class="fas fa-times-circle"></i> 
-                Error de conexión. Verifique su internet e inténtelo nuevamente.
-            </div>
-        `;
+                <div class="alert alert-danger alert-sm mb-0">
+                    <i class="fas fa-times-circle"></i> 
+                    Error de conexión. Verifique su internet e inténtelo nuevamente.
+                </div>
+            `;
             cedulaResult.style.display = 'block';
         } finally {
+            // Restaurar botón
             btnConsultar.disabled = false;
             btnConsultar.innerHTML = '<i class="fas fa-search"></i> Consultar';
         }
     }
 
+    function generarResumen() {
+        const resumenContainer = document.getElementById('resumenCita');
+
+        // Obtener datos del formulario
+        const formData = new FormData(document.getElementById('formAgendamiento'));
+
+        // Obtener nombres descriptivos
+        const tipoTexto = datosFormulario.tipo_cita === 'virtual' ? 'Virtual' : 'Presencial';
+        const especialidadTexto = especialidades.find(e => e.id_especialidad == datosFormulario.id_especialidad)?.nombre_especialidad || '';
+        const sucursalTexto = sucursales.find(s => s.id_sucursal == datosFormulario.id_sucursal)?.nombre_sucursal || '';
+        const medicoTexto = document.getElementById('medicoSeleccionado').selectedOptions[0]?.text || '';
+        const horaTexto = document.getElementById('horaSeleccionada').selectedOptions[0]?.text || '';
+
+        resumenContainer.innerHTML = `
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0"><i class="fas fa-calendar-check"></i> Resumen de la Cita</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Fecha:</strong> ${document.getElementById('fechaModalTitulo').textContent}</p>
+                            <p><strong>Hora:</strong> ${horaTexto}</p>
+                            <p><strong>Tipo:</strong> ${tipoTexto}</p>
+                            <p><strong>Especialidad:</strong> ${especialidadTexto}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Médico:</strong> ${medicoTexto}</p>
+                            <p><strong>Sucursal:</strong> ${sucursalTexto}</p>
+                            <p><strong>Paciente:</strong> ${formData.get('nombre_paciente')} ${formData.get('apellido_paciente')}</p>
+                            <p><strong>Email:</strong> ${formData.get('email_paciente')}</p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <p><strong>Motivo:</strong> ${formData.get('motivo_consulta')}</p>
+                            ${formData.get('observaciones') ? `<p><strong>Observaciones:</strong> ${formData.get('observaciones')}</p>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle"></i>
+                <strong>Importante:</strong> Verifique que todos los datos sean correctos antes de confirmar la cita.
+            </div>
+        `;
+
+        console.log('Resumen generado:', datosFormulario);
+    }
+
+    // Función para confirmar cita (placeholder)
+    function confirmarCita() {
+        // Mostrar loading
+        const btnConfirmar = document.getElementById('btnConfirmar');
+        const textoOriginal = btnConfirmar.innerHTML;
+        btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        btnConfirmar.disabled = true;
+
+        // Simular guardado
+        setTimeout(() => {
+            mostrarMensaje('success', 'Cita agendada exitosamente');
+
+            // Cerrar modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalAgendamiento'));
+            modal.hide();
+
+            // Restaurar botón
+            btnConfirmar.innerHTML = textoOriginal;
+            btnConfirmar.disabled = false;
+
+            console.log('Cita confirmada:', datosFormulario);
+        }, 2000);
+    }
 </script>
 
 </body>
