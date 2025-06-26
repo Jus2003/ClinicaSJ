@@ -2,31 +2,6 @@
 <project-private xmlns="http://www.netbeans.org/ns/project-private/1">
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
-        <group>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/perfil/datos.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/admin/roles.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/models/Role.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/includes/header.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/includes/navbar.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/password-generator.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/admin/usuarios/create.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/admin/usuarios/edit.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/phpmailer/OAuthTokenProvider.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/models/User.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/phpmailer/PHPMailer.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/permission-helper.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/admin/usuarios.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/phpmailer/Exception.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/phpmailer/DSNConfigurator.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/index.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/controllers/DashboardController.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/perfil/password.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/email-config.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/phpmailer/OAuth.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/controllers/PerfilController.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/dashboard/index.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/auth/login.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/config/database.php</file>
-        </group>
+        <group/>
     </open-files>
 </project-private>

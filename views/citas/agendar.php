@@ -9,13 +9,6 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Verificar permisos según rol
-$rolesPermitidos = [1, 2, 3, 4]; // Admin, Recepcionista, Médico, Paciente
-if (!in_array($_SESSION['role_id'], $rolesPermitidos)) {
-    header('Location: index.php?action=dashboard');
-    exit;
-}
-
 // Obtener datos necesarios
 $especialidadModel = new Especialidad();
 $sucursalModel = new Sucursal();
