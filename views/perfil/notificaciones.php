@@ -460,6 +460,12 @@ include 'views/includes/navbar.php';
         });
 
         function cargarUsuariosDisponibles() {
+            console.log('=== INICIANDO CARGA DE USUARIOS ===');
+            console.log('URL actual:', window.location.href);
+
+            const listaContainer = document.getElementById('listaDestinatarios');
+            listaContainer.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Cargando usuarios...</div>';
+
             fetch('index.php?action=perfil/notificaciones', {
                 method: 'POST',
                 headers: {
@@ -467,20 +473,58 @@ include 'views/includes/navbar.php';
                 },
                 body: 'ajax_action=obtener_usuarios'
             })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            usuariosDisponibles = data.data;
-                            mostrarListaUsuarios(usuariosDisponibles);
-                        } else {
-                            document.getElementById('listaDestinatarios').innerHTML =
-                                    '<div class="text-danger text-center py-3"><i class="fas fa-exclamation-triangle me-1"></i>Error al cargar usuarios</div>';
+                    .then(response => {
+                        console.log('=== RESPUESTA RECIBIDA ===');
+                        console.log('Status:', response.status);
+                        console.log('StatusText:', response.statusText);
+                        console.log('Headers:', [...response.headers.entries()]);
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        return response.text();
+                    })
+                    .then(text => {
+                        console.log('=== TEXTO RAW RECIBIDO ===');
+                        console.log('Length:', text.length);
+                        console.log('Content:', text);
+
+                        // Limpiar posible BOM o espacios
+                        const cleanText = text.trim();
+
+                        if (!cleanText) {
+                            throw new Error('Respuesta vacía del servidor');
+                        }
+
+                        try {
+                            const data = JSON.parse(cleanText);
+                            console.log('=== JSON PARSEADO ===');
+                            console.log('Success:', data.success);
+                            console.log('Message:', data.message);
+                            console.log('Data:', data.data);
+
+                            if (data.success) {
+                                if (data.data && data.data.length > 0) {
+                                    usuariosDisponibles = data.data;
+                                    mostrarListaUsuarios(usuariosDisponibles);
+                                    console.log('✅ Usuarios cargados exitosamente:', data.data.length);
+                                } else {
+                                    listaContainer.innerHTML = '<div class="text-warning text-center py-3"><i class="fas fa-exclamation-triangle me-1"></i>No hay usuarios disponibles</div>';
+                                }
+                            } else {
+                                console.error('❌ Error en respuesta:', data.message);
+                                listaContainer.innerHTML = `<div class="text-danger text-center py-3"><i class="fas fa-exclamation-triangle me-1"></i>Error: ${data.message}</div>`;
+                            }
+                        } catch (parseError) {
+                            console.error('❌ Error parsing JSON:', parseError);
+                            console.error('Texto que falló:', cleanText.substring(0, 500));
+                            listaContainer.innerHTML = '<div class="text-danger text-center py-3"><i class="fas fa-exclamation-triangle me-1"></i>Error: Respuesta inválida del servidor</div>';
                         }
                     })
                     .catch(error => {
-                        console.error('Error:', error);
-                        document.getElementById('listaDestinatarios').innerHTML =
-                                '<div class="text-danger text-center py-3"><i class="fas fa-exclamation-triangle me-1"></i>Error al cargar usuarios</div>';
+                        console.error('❌ Error en fetch:', error);
+                        listaContainer.innerHTML = `<div class="text-danger text-center py-3"><i class="fas fa-exclamation-triangle me-1"></i>Error: ${error.message}</div>`;
                     });
         }
 
@@ -497,15 +541,15 @@ include 'views/includes/navbar.php';
                 }
 
                 html += `
-                    <div class="form-check mb-1">
-                        <input class="form-check-input destinatario-check" type="checkbox" 
-                               value="${usuario.id_usuario}" id="user_${usuario.id_usuario}"
-                               data-rol="${usuario.nombre_rol}">
-                        <label class="form-check-label" for="user_${usuario.id_usuario}">
-                            ${usuario.nombre_completo}
-                        </label>
-                    </div>
-                `;
+                            <div class="form-check mb-1">
+                                <input class="form-check-input destinatario-check" type="checkbox" 
+                                       value="${usuario.id_usuario}" id="user_${usuario.id_usuario}"
+                                       data-rol="${usuario.nombre_rol}">
+                                <label class="form-check-label" for="user_${usuario.id_usuario}">
+                                    ${usuario.nombre_completo}
+                                </label>
+                            </div>
+                        `;
             });
 
             if (rolActual !== '')

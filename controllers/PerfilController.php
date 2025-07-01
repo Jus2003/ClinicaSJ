@@ -139,31 +139,45 @@ class PerfilController {
     private function handleNotificacionAjax() {
         header('Content-Type: application/json');
 
+        // Debug logging
+        error_log("=== AJAX NOTIFICACIONES DEBUG ===");
+        error_log("POST data: " . print_r($_POST, true));
+        error_log("Session data: " . print_r($_SESSION, true));
+
         require_once 'models/Notificacion.php';
         $notificacionModel = new Notificacion();
 
-        $action = $_POST['ajax_action'];
+        $action = $_POST['ajax_action'] ?? '';
         $response = ['success' => false, 'message' => ''];
 
         try {
+            error_log("Procesando acción: " . $action);
+
             switch ($action) {
+                case 'obtener_usuarios':
+                    error_log("Verificando permisos - Role ID: " . ($_SESSION['role_id'] ?? 'no definido'));
+
+                    // Solo admin puede ver lista de usuarios
+                    if (!isset($_SESSION['role_id']) || $_SESSION['role_id'] != 1) {
+                        throw new Exception('No tiene permisos para esta acción. Role: ' . ($_SESSION['role_id'] ?? 'no definido'));
+                    }
+
+                    error_log("Obteniendo usuarios...");
+                    $usuarios = $notificacionModel->getUsuariosParaNotificacion();
+                    error_log("Usuarios obtenidos: " . count($usuarios));
+
+                    $response['success'] = true;
+                    $response['data'] = $usuarios;
+                    break;
+
                 case 'marcar_leida':
-                    $id_notificacion = intval($_POST['id_notificacion']);
+                    $id_notificacion = intval($_POST['id_notificacion'] ?? 0);
                     if ($notificacionModel->marcarComoLeida($id_notificacion)) {
                         $response['success'] = true;
                         $response['message'] = 'Notificación marcada como leída';
+                    } else {
+                        throw new Exception('Error al marcar como leída');
                     }
-                    break;
-
-                case 'obtener_usuarios':
-                    // Solo admin puede ver lista de usuarios
-                    if ($_SESSION['role_id'] != 1) {
-                        throw new Exception('No tiene permisos para esta acción');
-                    }
-
-                    $usuarios = $notificacionModel->getUsuariosParaNotificacion();
-                    $response['success'] = true;
-                    $response['data'] = $usuarios;
                     break;
 
                 case 'marcar_todas_leidas':
@@ -171,13 +185,11 @@ class PerfilController {
                     $user_role = $_SESSION['role_id'];
 
                     if (in_array($user_role, [1, 2])) {
-                        // Admin/recepcionista pueden marcar todas
                         if ($notificacionModel->marcarTodasLeidasAdmin()) {
                             $response['success'] = true;
                             $response['message'] = 'Todas las notificaciones marcadas como leídas';
                         }
                     } else {
-                        // Usuario normal solo las suyas
                         if ($notificacionModel->marcarTodasLeidasUsuario($user_id)) {
                             $response['success'] = true;
                             $response['message'] = 'Todas tus notificaciones marcadas como leídas';
@@ -186,15 +198,16 @@ class PerfilController {
                     break;
 
                 case 'eliminar_notificacion':
-                    $id_notificacion = intval($_POST['id_notificacion']);
+                    $id_notificacion = intval($_POST['id_notificacion'] ?? 0);
                     if ($notificacionModel->eliminarNotificacion($id_notificacion)) {
                         $response['success'] = true;
                         $response['message'] = 'Notificación eliminada';
+                    } else {
+                        throw new Exception('Error al eliminar notificación');
                     }
                     break;
 
                 case 'crear_notificacion_admin':
-                    // Solo admin puede crear notificaciones manuales
                     if ($_SESSION['role_id'] != 1) {
                         throw new Exception('No tiene permisos para esta acción');
                     }
@@ -202,6 +215,7 @@ class PerfilController {
                     $destinatarios = $_POST['destinatarios'] ?? [];
                     $titulo = trim($_POST['titulo'] ?? '');
                     $mensaje = trim($_POST['mensaje'] ?? '');
+                    $enviar_email = ($_POST['enviar_email'] ?? '0') === '1';
 
                     if (empty($titulo) || empty($mensaje) || empty($destinatarios)) {
                         throw new Exception('Todos los campos son obligatorios');
@@ -209,7 +223,7 @@ class PerfilController {
 
                     $count = 0;
                     foreach ($destinatarios as $user_id) {
-                        if ($notificacionModel->crearNotificacion($user_id, 'sistema', $titulo, $mensaje)) {
+                        if ($notificacionModel->crearNotificacion($user_id, 'sistema', $titulo, $mensaje, null, $enviar_email)) {
                             $count++;
                         }
                     }
@@ -218,27 +232,16 @@ class PerfilController {
                     $response['message'] = "Notificación enviada a {$count} usuario(s)";
                     break;
 
-                case 'obtener_notificaciones':
-                    $user_id = $_SESSION['user_id'];
-                    $user_role = $_SESSION['role_id'];
-
-                    if (in_array($user_role, [1, 2])) {
-                        $notificaciones = $notificacionModel->getAllNotificaciones();
-                    } else {
-                        $notificaciones = $notificacionModel->getNotificacionesByUsuario($user_id);
-                    }
-
-                    $response['success'] = true;
-                    $response['data'] = $notificaciones;
-                    break;
-
                 default:
-                    throw new Exception('Acción no válida');
+                    throw new Exception('Acción no válida: ' . $action);
             }
         } catch (Exception $e) {
+            error_log("Error en AJAX: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             $response['message'] = $e->getMessage();
         }
 
+        error_log("Response: " . json_encode($response));
         echo json_encode($response);
         exit;
     }

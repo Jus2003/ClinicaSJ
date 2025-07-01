@@ -117,16 +117,30 @@ class Notificacion {
     }
 
     public function getUsuariosParaNotificacion() {
-        $query = "SELECT id_usuario, CONCAT(nombre, ' ', apellido) as nombre_completo, 
+        try {
+            error_log("Ejecutando query para obtener usuarios...");
+
+            $query = "SELECT u.id_usuario, CONCAT(u.nombre, ' ', u.apellido) as nombre_completo, 
                          r.nombre_rol
                   FROM usuarios u
                   JOIN roles r ON u.id_rol = r.id_rol
                   WHERE u.activo = 1
                   ORDER BY r.nombre_rol, u.nombre, u.apellido";
 
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute();
+            $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            error_log("Query ejecutada exitosamente. Usuarios encontrados: " . count($result));
+            foreach ($result as $usuario) {
+                error_log("Usuario: " . $usuario['nombre_completo'] . " - Rol: " . $usuario['nombre_rol']);
+            }
+
+            return $result;
+        } catch (Exception $e) {
+            error_log("Error en getUsuariosParaNotificacion: " . $e->getMessage());
+            throw $e;
+        }
     }
 }
 
