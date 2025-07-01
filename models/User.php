@@ -47,6 +47,26 @@ class User {
         ]);
     }
 
+    // Agregar este método a models/User.php
+
+    public function getPacientes() {
+        $sql = "SELECT id_usuario, username, email, cedula, nombre, apellido, 
+                   fecha_nacimiento, genero, telefono, activo, fecha_registro
+            FROM usuarios 
+            WHERE id_rol = 4 
+            ORDER BY nombre, apellido";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function toggleUserStatus($userId) {
+        $sql = "UPDATE usuarios SET activo = CASE WHEN activo = 1 THEN 0 ELSE 1 END WHERE id_usuario = :id";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute(['id' => $userId]);
+    }
+
     // CRUD - Obtener todos los usuarios activos con paginación
     public function getAllUsers($page = 1, $limit = 10, $search = '', $roleFilter = '') {
         $offset = ($page - 1) * $limit;
@@ -375,25 +395,25 @@ class User {
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['id' => $userId]);
     }
-    
+
     // Actualizar solo datos de perfil (sin rol ni sucursal)
     public function updateUserProfile($id, $data) {
         try {
             $this->db->beginTransaction();
-            
+
             // Verificar unicidad (excluyendo el usuario actual)
             if ($this->usernameExists($data['username'], $id)) {
                 throw new Exception("El nombre de usuario ya existe");
             }
-            
+
             if ($this->emailExists($data['email'], $id)) {
                 throw new Exception("El email ya existe");
             }
-            
+
             if (!empty($data['cedula']) && $this->cedulaExists($data['cedula'], $id)) {
                 throw new Exception("La cédula ya existe");
             }
-            
+
             $sql = "UPDATE usuarios SET 
                     username = :username, 
                     email = :email, 
@@ -405,7 +425,7 @@ class User {
                     direccion = :direccion,
                     cedula = :cedula
                     WHERE id_usuario = :id";
-            
+
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
                 'username' => $data['username'],
@@ -419,24 +439,51 @@ class User {
                 'cedula' => $data['cedula'],
                 'id' => $id
             ]);
-            
+
             $this->db->commit();
             return true;
-            
         } catch (Exception $e) {
             $this->db->rollback();
             throw $e;
         }
     }
-    
+
     // Cambiar contraseña sin requerir cambio forzado
     public function changeUserPassword($userId, $newPassword) {
         $sql = "UPDATE usuarios SET password = :password WHERE id_usuario = :id";
         $stmt = $this->db->prepare($sql);
         return $stmt->execute([
-            'password' => base64_encode($newPassword),
-            'id' => $userId
+                    'password' => base64_encode($newPassword),
+                    'id' => $userId
         ]);
+    }
+
+    // Agregar este método a models/User.php
+    // Reemplaza el método getHistorialPaciente() en models/User.php
+    public function getHistorialPaciente($pacienteId) {
+        $sql = "SELECT 
+                c.id_cita,
+                c.fecha_cita,
+                c.hora_cita,
+                c.tipo_cita,
+                c.estado_cita,
+                c.motivo_consulta,
+                CONCAT(m.nombre, ' ', m.apellido) as nombre_medico,
+                e.nombre_especialidad,
+                s.nombre_sucursal,
+                con.diagnostico_principal,
+                con.tratamiento
+            FROM citas c
+            INNER JOIN usuarios m ON c.id_medico = m.id_usuario
+            INNER JOIN especialidades e ON c.id_especialidad = e.id_especialidad
+            INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
+            LEFT JOIN consultas con ON c.id_cita = con.id_cita
+            WHERE c.id_paciente = :paciente_id
+            ORDER BY c.fecha_cita DESC, c.hora_cita DESC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['paciente_id' => $pacienteId]);
+        return $stmt->fetchAll();
     }
 }
 

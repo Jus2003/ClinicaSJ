@@ -15,6 +15,7 @@ if (!$isPublic && !isset($_SESSION['user_id'])) {
 }
 
 // Convertir la acción en ruta de archivo
+// Ahora soporta tanto rutas simples como con subcarpetas
 $viewPath = "views/{$action}.php";
 
 // Si la vista no existe, ir a la página apropiada por defecto
