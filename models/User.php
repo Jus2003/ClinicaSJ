@@ -61,6 +61,14 @@ class User {
         return $stmt->fetchAll();
     }
 
+    // Buscar usuario por cédula
+    public function getUserByCedula($cedula) {
+        $sql = "SELECT * FROM usuarios WHERE cedula = :cedula AND activo = 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['cedula' => $cedula]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
     public function toggleUserStatus($userId) {
         $sql = "UPDATE usuarios SET activo = CASE WHEN activo = 1 THEN 0 ELSE 1 END WHERE id_usuario = :id";
         $stmt = $this->db->prepare($sql);

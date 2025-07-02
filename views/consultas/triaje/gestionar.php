@@ -69,7 +69,7 @@ if ($buscar) {
     $params['buscar'] = "%{$buscar}%";
 }
 
-$sql = "SELECT c.id_cita, c.fecha_cita, c.hora_cita, c.estado as estado_cita,
+$sql = "SELECT c.id_cita, c.fecha_cita, c.hora_cita, c.estado_cita as estado_cita,
                CONCAT(p.nombre, ' ', p.apellido) as paciente_nombre,
                p.cedula as paciente_cedula,
                p.telefono as paciente_telefono,
