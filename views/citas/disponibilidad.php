@@ -16,12 +16,13 @@ require_once 'config/database.php';
 $database = new Database();
 $db = $database->getConnection();
 
-// Obtener médicos activos
-$sqlMedicos = "SELECT u.id_usuario, u.nombre, u.apellido, 
+// Obtener médicos activos con su sucursal
+$sqlMedicos = "SELECT u.id_usuario, u.nombre, u.apellido, u.id_sucursal, s.nombre_sucursal,
                       GROUP_CONCAT(e.nombre_especialidad SEPARATOR ', ') as especialidades
                FROM usuarios u 
                INNER JOIN medico_especialidades me ON u.id_usuario = me.id_medico
                INNER JOIN especialidades e ON me.id_especialidad = e.id_especialidad
+               LEFT JOIN sucursales s ON u.id_sucursal = s.id_sucursal
                WHERE u.id_rol = 3 AND u.activo = 1 AND me.activo = 1
                GROUP BY u.id_usuario
                ORDER BY u.nombre, u.apellido";
@@ -30,7 +31,7 @@ $stmtMedicos = $db->prepare($sqlMedicos);
 $stmtMedicos->execute();
 $medicos = $stmtMedicos->fetchAll(PDO::FETCH_ASSOC);
 
-// Obtener sucursales activas
+// Obtener sucursales activas (para el modal)
 $sqlSucursales = "SELECT * FROM sucursales WHERE activo = 1 ORDER BY nombre_sucursal";
 $stmtSucursales = $db->prepare($sqlSucursales);
 $stmtSucursales->execute();
@@ -60,27 +61,28 @@ include 'views/includes/navbar.php';
                 </div>
             </div>
 
-            <!-- Filtros -->
+            <!-- Filtros CORREGIDOS -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-8">
                             <label class="form-label">Seleccionar Médico</label>
                             <select class="form-select" id="selectMedico">
                                 <option value="">Seleccione un médico...</option>
                                 <?php foreach ($medicos as $medico): ?>
-                                    <option value="<?php echo $medico['id_usuario']; ?>">
+                                    <option value="<?php echo $medico['id_usuario']; ?>" 
+                                            data-sucursal="<?php echo $medico['id_sucursal']; ?>"
+                                            data-sucursal-nombre="<?php echo htmlspecialchars($medico['nombre_sucursal']); ?>">
                                         Dr. <?php echo htmlspecialchars($medico['nombre'] . ' ' . $medico['apellido']); ?>
                                         (<?php echo htmlspecialchars($medico['especialidades']); ?>)
                                     </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Sucursal</label>
-                            <select class="form-select" id="selectSucursal" disabled>
-                                <option value="">Primero seleccione un médico</option>
-                            </select>
+                        <div class="col-md-4">
+                            <label class="form-label">Sucursal Asignada</label>
+                            <input type="text" class="form-control" id="sucursalMedico" readonly placeholder="Seleccione un médico">
+                            <input type="hidden" id="sucursalIdMedico">
                         </div>
                     </div>
                 </div>
@@ -153,8 +155,7 @@ include 'views/includes/navbar.php';
         </div>
     </div>
 </div>
-
-<!-- Modal para Agregar/Editar Horario -->
+<!-- Modal para Agregar/Editar Horario CORREGIDO -->
 <div class="modal fade" id="modalHorario" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -170,6 +171,7 @@ include 'views/includes/navbar.php';
                     <input type="hidden" id="horarioId" name="id_horario">
                     <input type="hidden" id="medicoId" name="id_medico">
                     <input type="hidden" id="diaSemana" name="dia_semana">
+                    <input type="hidden" id="sucursalId" name="id_sucursal">
 
                     <div class="mb-3">
                         <label class="form-label">Día de la Semana</label>
@@ -177,15 +179,8 @@ include 'views/includes/navbar.php';
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Sucursal <span class="text-danger">*</span></label>
-                        <select class="form-select" id="sucursalHorario" name="id_sucursal" required>
-                            <option value="">Seleccione una sucursal</option>
-                            <?php foreach ($sucursales as $sucursal): ?>
-                                <option value="<?php echo $sucursal['id_sucursal']; ?>">
-                                    <?php echo htmlspecialchars($sucursal['nombre_sucursal']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                        <label class="form-label">Sucursal</label>
+                        <input type="text" class="form-control" id="sucursalNombre" readonly>
                     </div>
 
                     <div class="row">
@@ -219,6 +214,7 @@ include 'views/includes/navbar.php';
     </div>
 </div>
 
+<!-- CSS -->
 <style>
     .horario-card {
         transition: all 0.3s ease;
@@ -253,10 +249,16 @@ include 'views/includes/navbar.php';
         text-align: center;
         color: #856404;
     }
+
+    .btn-horario {
+        border-radius: 20px;
+        padding: 8px 20px;
+        font-weight: 500;
+    }
 </style>
 
+<!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <script>
     // Variables globales
     let medicoSeleccionado = null;
@@ -279,7 +281,6 @@ include 'views/includes/navbar.php';
 
         // Event listeners
         document.getElementById('selectMedico').addEventListener('change', handleMedicoChange);
-        document.getElementById('selectSucursal').addEventListener('change', handleSucursalChange);
         document.getElementById('btnNuevoHorario').addEventListener('click', mostrarModalNuevo);
         document.getElementById('btnGuardarHorario').addEventListener('click', guardarHorario);
 
@@ -292,23 +293,32 @@ include 'views/includes/navbar.php';
         });
     });
 
-    // Manejar cambio de médico
+    // Manejar cambio de médico CORREGIDO
     function handleMedicoChange() {
         const medicoId = this.value;
+        const selectedOption = this.options[this.selectedIndex];
+
         medicoSeleccionado = medicoId;
 
         if (medicoId) {
+            // Obtener datos de la sucursal del médico
+            const sucursalId = selectedOption.getAttribute('data-sucursal');
+            const sucursalNombre = selectedOption.getAttribute('data-sucursal-nombre');
+
+            sucursalSeleccionada = sucursalId;
+
+            // Mostrar sucursal del médico
+            document.getElementById('sucursalMedico').value = sucursalNombre || 'Sin sucursal asignada';
+            document.getElementById('sucursalIdMedico').value = sucursalId;
+
             // Mostrar información del médico
             mostrarInfoMedico(medicoId);
 
-            // Cargar sucursales del médico
-            cargarSucursalesMedico(medicoId);
-
             // Habilitar controles
-            document.getElementById('selectSucursal').disabled = false;
             document.querySelectorAll('.btn-agregar-horario').forEach(btn => {
                 btn.disabled = false;
             });
+            document.getElementById('btnNuevoHorario').disabled = false;
 
             // Cargar horarios existentes
             cargarHorariosMedico(medicoId);
@@ -317,18 +327,6 @@ include 'views/includes/navbar.php';
             // Ocultar información y resetear
             ocultarInfoMedico();
             resetearControles();
-        }
-    }
-
-    // Manejar cambio de sucursal
-    function handleSucursalChange() {
-        sucursalSeleccionada = this.value;
-
-        if (sucursalSeleccionada && medicoSeleccionado) {
-            document.getElementById('btnNuevoHorario').disabled = false;
-            cargarHorariosMedico(medicoSeleccionado, sucursalSeleccionada);
-        } else {
-            document.getElementById('btnNuevoHorario').disabled = true;
         }
     }
 
@@ -360,8 +358,8 @@ include 'views/includes/navbar.php';
 
     // Resetear controles
     function resetearControles() {
-        document.getElementById('selectSucursal').disabled = true;
-        document.getElementById('selectSucursal').value = '';
+        document.getElementById('sucursalMedico').value = '';
+        document.getElementById('sucursalIdMedico').value = '';
         document.getElementById('btnNuevoHorario').disabled = true;
 
         document.querySelectorAll('.btn-agregar-horario').forEach(btn => {
@@ -372,37 +370,14 @@ include 'views/includes/navbar.php';
         for (let i = 1; i <= 7; i++) {
             document.getElementById(`horarios-dia-${i}`).innerHTML = '';
         }
+
+        medicoSeleccionado = null;
+        sucursalSeleccionada = null;
     }
 
-    // Cargar sucursales del médico
-    function cargarSucursalesMedico(medicoId) {
-        fetch(`views/api/obtener-sucursales-medico.php?medico_id=${medicoId}`)
-                .then(response => response.json())
-                .then(data => {
-                    const select = document.getElementById('selectSucursal');
-                    select.innerHTML = '<option value="">Seleccione una sucursal</option>';
-
-                    if (data.success && data.sucursales) {
-                        data.sucursales.forEach(sucursal => {
-                            const option = document.createElement('option');
-                            option.value = sucursal.id_sucursal;
-                            option.textContent = sucursal.nombre_sucursal;
-                            select.appendChild(option);
-                        });
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    Swal.fire('Error', 'No se pudieron cargar las sucursales', 'error');
-                });
-    }
-
-    // Cargar horarios del médico
-    function cargarHorariosMedico(medicoId, sucursalId = null) {
+    // Cargar horarios del médico SIMPLIFICADO
+    function cargarHorariosMedico(medicoId) {
         let url = `views/api/obtener-horarios-medico.php?medico_id=${medicoId}`;
-        if (sucursalId) {
-            url += `&sucursal_id=${sucursalId}`;
-        }
 
         fetch(url)
                 .then(response => response.json())
@@ -493,7 +468,12 @@ include 'views/includes/navbar.php';
         document.getElementById('formHorario').reset();
         document.getElementById('horarioId').value = '';
         document.getElementById('medicoId').value = medicoSeleccionado;
+        document.getElementById('sucursalId').value = sucursalSeleccionada;
         document.getElementById('modalTitulo').textContent = 'Nuevo Horario';
+
+        // Mostrar nombre de sucursal
+        const sucursalNombre = document.getElementById('sucursalMedico').value;
+        document.getElementById('sucursalNombre').value = sucursalNombre;
 
         modalHorario.show();
     }
@@ -509,18 +489,18 @@ include 'views/includes/navbar.php';
         document.getElementById('formHorario').reset();
         document.getElementById('horarioId').value = '';
         document.getElementById('medicoId').value = medicoSeleccionado;
+        document.getElementById('sucursalId').value = sucursalSeleccionada;
         document.getElementById('diaSemana').value = dia;
         document.getElementById('diaNombre').value = dias[dia];
         document.getElementById('modalTitulo').textContent = `Nuevo Horario - ${dias[dia]}`;
 
-        if (sucursalSeleccionada) {
-            document.getElementById('sucursalHorario').value = sucursalSeleccionada;
-        }
+        // Mostrar nombre de sucursal
+        const sucursalNombre = document.getElementById('sucursalMedico').value;
+        document.getElementById('sucursalNombre').value = sucursalNombre;
 
         modalHorario.show();
     }
 
-    // Función placeholder para editar horario (implementar cuando tengamos la API)
     // Editar horario
     function editarHorario(horarioId) {
         fetch(`views/api/obtener-horario.php?id=${horarioId}`)
@@ -531,9 +511,10 @@ include 'views/includes/navbar.php';
 
                         document.getElementById('horarioId').value = horario.id_horario;
                         document.getElementById('medicoId').value = horario.id_medico;
+                        document.getElementById('sucursalId').value = horario.id_sucursal;
                         document.getElementById('diaSemana').value = horario.dia_semana;
                         document.getElementById('diaNombre').value = dias[horario.dia_semana];
-                        document.getElementById('sucursalHorario').value = horario.id_sucursal;
+                        document.getElementById('sucursalNombre').value = horario.nombre_sucursal;
                         document.getElementById('horaInicio').value = horario.hora_inicio;
                         document.getElementById('horaFin').value = horario.hora_fin;
                         document.getElementById('modalTitulo').textContent = `Editar Horario - ${dias[horario.dia_semana]}`;
@@ -549,7 +530,6 @@ include 'views/includes/navbar.php';
                 });
     }
 
-    // Función placeholder para eliminar horario (implementar cuando tengamos la API)
     // Eliminar horario
     function eliminarHorario(horarioId) {
         Swal.fire({
@@ -574,7 +554,7 @@ include 'views/includes/navbar.php';
                         .then(data => {
                             if (data.success) {
                                 Swal.fire('Eliminado', 'El horario ha sido eliminado', 'success');
-                                cargarHorariosMedico(medicoSeleccionado, sucursalSeleccionada);
+                                cargarHorariosMedico(medicoSeleccionado);
                             } else {
                                 Swal.fire('Error', data.error || 'No se pudo eliminar el horario', 'error');
                             }
@@ -587,7 +567,6 @@ include 'views/includes/navbar.php';
         });
     }
 
-    // Función placeholder para guardar horario (implementar cuando tengamos la API)
     // Guardar horario
     function guardarHorario() {
         const formData = new FormData(document.getElementById('formHorario'));
@@ -604,7 +583,7 @@ include 'views/includes/navbar.php';
                     if (data.success) {
                         Swal.fire('Éxito', 'Horario guardado correctamente', 'success');
                         modalHorario.hide();
-                        cargarHorariosMedico(medicoSeleccionado, sucursalSeleccionada);
+                        cargarHorariosMedico(medicoSeleccionado);
                     } else {
                         Swal.fire('Error', data.error || 'No se pudo guardar el horario', 'error');
                     }
@@ -618,3 +597,4 @@ include 'views/includes/navbar.php';
 
 </body>
 </html>
+
