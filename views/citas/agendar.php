@@ -3958,26 +3958,79 @@ include 'views/includes/navbar.php';
      CONFIRMACIÓN FINAL DE LA CITA
      ================================ */
 
-    function confirmarCita() {
-        console.log('🎯 Iniciando confirmación de cita...');
+    // Función para confirmar cita (versión real)
+    async function confirmarCita() {
+        try {
+            // Mostrar loading
+            const btnConfirmar = document.getElementById('btnConfirmar');
+            const textoOriginal = btnConfirmar.innerHTML;
+            btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+            btnConfirmar.disabled = true;
 
-        if (!validarTerminos()) {
-            return;
+            // Recopilar datos del formulario
+            const form = document.getElementById('formAgendamiento');
+            const formData = new FormData(form);
+
+            // Preparar datos para enviar
+            const datosEnvio = {
+                fecha_cita: datosFormulario.fecha_cita,
+                tipo_cita: datosFormulario.tipo_cita,
+                id_especialidad: datosFormulario.id_especialidad,
+                id_sucursal: datosFormulario.id_sucursal,
+                id_medico: datosFormulario.id_medico,
+                hora_cita: datosFormulario.hora_cita,
+                motivo_consulta: formData.get('motivo_consulta'),
+                observaciones: formData.get('observaciones') || '',
+                id_paciente: formData.get('id_paciente') || '<?php echo $_SESSION["user_id"]; ?>'
+            };
+
+            console.log('📤 Enviando datos:', datosEnvio);
+
+            // Realizar petición al servidor
+            const response = await fetch('views/api/agendar-cita.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(datosEnvio)
+            });
+
+            console.log('📨 Respuesta del servidor:', response.status);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('✅ Resultado:', result);
+
+            if (result.success) {
+                mostrarMensaje('success', result.message || 'Cita agendada exitosamente');
+
+                // Cerrar modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('modalAgendamiento'));
+                modal.hide();
+
+                // Opcional: recargar la página o redirigir
+                setTimeout(() => {
+                    window.location.href = 'index.php?action=citas/gestionar';
+                }, 2000);
+            } else {
+                throw new Error(result.error || 'Error desconocido al agendar la cita');
+            }
+
+        } catch (error) {
+            console.error('❌ Error al agendar cita:', error);
+            manejarErrorConfirmacion(error);
+        } finally {
+            // Restaurar botón
+            const btnConfirmar = document.getElementById('btnConfirmar');
+            btnConfirmar.innerHTML = '<i class="fas fa-save"></i> Confirmar Cita';
+            btnConfirmar.disabled = false;
         }
-
-        const form = document.getElementById('formAgendamiento');
-        const formData = new FormData(form);
-        const btnConfirmar = document.getElementById('btnConfirmar');
-
-        // Preparar datos para envío
-        const datosCita = prepararDatosParaEnvio(formData);
-
-        // Mostrar loading
-        mostrarLoadingConfirmacion(btnConfirmar);
-
-        // Enviar datos al servidor
-        enviarDatosAlServidor(datosCita, btnConfirmar);
     }
+
+
 
     function prepararDatosParaEnvio(formData) {
         const datos = {
@@ -4181,19 +4234,17 @@ include 'views/includes/navbar.php';
         });
     }
 
-    function manejarErrorConfirmacion(error, btnConfirmar) {
-        console.error('❌ Error en confirmación:', error);
+    function manejarErrorConfirmacion(error) {
+        let mensaje = 'Error desconocido';
 
-        // Restaurar botón
-        restaurarBotonConfirmacion(btnConfirmar);
+        if (error.message.includes('Unexpected token')) {
+            mensaje = 'Error del servidor. Por favor, contacte al administrador.';
+        } else {
+            mensaje = error.message;
+        }
 
-        // Mostrar error
-        const mensaje = error.message || 'Error desconocido al agendar la cita';
         mostrarMensaje('danger', `❌ Error: ${mensaje}`);
-
-        // Habilitar botones
-        document.getElementById('btnAnterior').disabled = false;
-        document.querySelector('[data-bs-dismiss="modal"]').disabled = false;
+        console.log('📢 Mensaje mostrado [danger]:', `❌ Error: ${mensaje}`);
     }
 
     function restaurarBotonConfirmacion(btnConfirmar) {

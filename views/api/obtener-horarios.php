@@ -32,7 +32,7 @@ try {
     
     // CORRECCIÓN: Calcular día de la semana correctamente
     $timestamp = strtotime($fecha);
-    $diaSemana = date('N', $timestamp); // 1=Lunes, 7=Domingo
+    $diaSemana = date('w', $timestamp) + 1; // 1=Lunes, 7=Domingo
     
     // Obtener duración de la cita para esta especialidad
     $sqlDuracion = "SELECT duracion_cita_minutos FROM especialidades WHERE id_especialidad = :especialidad";

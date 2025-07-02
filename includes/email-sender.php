@@ -1,4 +1,5 @@
 <?php
+
 require_once 'includes/phpmailer/PHPMailer.php';
 require_once 'includes/phpmailer/SMTP.php';
 require_once 'includes/phpmailer/Exception.php';
@@ -10,7 +11,7 @@ use PHPMailer\PHPMailer\Exception;
 
 function enviarEmailNotificacion($email, $nombreCompleto, $titulo, $mensaje) {
     $mail = new PHPMailer(true);
-    
+
     try {
         // Configuración del servidor
         $mail->isSMTP();
@@ -21,23 +22,31 @@ function enviarEmailNotificacion($email, $nombreCompleto, $titulo, $mensaje) {
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port = SMTP_PORT;
         $mail->CharSet = 'UTF-8';
-        
+
         // Remitente y destinatario
         $mail->setFrom(SMTP_FROM_EMAIL, SMTP_FROM_NAME);
         $mail->addAddress($email, $nombreCompleto);
         $mail->addReplyTo(SUPPORT_EMAIL, 'Soporte Clínica SJ');
-        
+
         // Contenido del email
         $mail->isHTML(true);
         $mail->Subject = $titulo;
-        $mail->Body = generarPlantillaNotificacion($nombreCompleto, $titulo, $mensaje);
+
+        // CAMBIO IMPORTANTE: Verificar si el mensaje ya viene formateado en HTML
+        if (strpos($mensaje, '<div') !== false || strpos($mensaje, '<html') !== false) {
+            // El mensaje ya viene con formato HTML completo (como los de NotificacionesCitas)
+            $mail->Body = $mensaje;
+        } else {
+            // El mensaje es texto simple, usar plantilla genérica
+            $mail->Body = generarPlantillaNotificacion($nombreCompleto, $titulo, $mensaje);
+        }
+
         $mail->AltBody = strip_tags($mensaje);
-        
+
         $mail->send();
-        
+
         error_log("Email de notificación enviado exitosamente a: {$email}");
         return true;
-        
     } catch (Exception $e) {
         error_log("Error enviando email de notificación a {$email}: {$mail->ErrorInfo}");
         return false;
@@ -89,4 +98,10 @@ function generarPlantillaNotificacion($nombreCompleto, $titulo, $mensaje) {
     </body>
     </html>";
 }
+
+// Función adicional para notificaciones simples (opcional)
+function enviarEmailSimple($email, $nombreCompleto, $titulo, $mensaje) {
+    return enviarEmailNotificacion($email, $nombreCompleto, $titulo, $mensaje);
+}
+
 ?>

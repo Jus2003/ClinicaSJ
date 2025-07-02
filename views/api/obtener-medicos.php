@@ -33,10 +33,8 @@ try {
     // CORRECCIÓN: Calcular día de la semana correctamente
     // En tu BD: 1=Lunes, 2=Martes, ..., 7=Domingo
     $timestamp = strtotime($fecha);
-    $diaSemanaISO = date('N', $timestamp); // 1=Lunes, 7=Domingo
-    
-    // Convertir a formato de tu BD
-    $diaSemana = $diaSemanaISO; // Ya está en el formato correcto
+    $diaSemana = date('w', $timestamp) + 1; // 1=Lunes, 7=Domingo
+
     
     $sql = "SELECT DISTINCT u.id_usuario, u.nombre, u.apellido, u.email
             FROM usuarios u
