@@ -1,38 +1,113 @@
 <?php
+
 require_once 'config/database.php';
 require_once 'includes/email-sender.php';
 
 class NotificacionesCitas {
+
     private $db;
-    
+
     public function __construct() {
         $database = new Database();
         $this->db = $database->getConnection();
     }
-    
+
     /**
      * Enviar notificación cuando se agenda una nueva cita
      */
     public function notificarNuevaCita($citaId) {
+
+        if (ob_get_contents())
+            ob_clean();
         try {
             $datosCita = $this->obtenerDatosCita($citaId);
             if (!$datosCita) {
                 throw new Exception("Cita no encontrada");
             }
-            
+
             // Notificar al paciente
-            $this->enviarNotificacionPaciente($datosCita, 'nueva_cita');
-            
+            $pacienteNotificado = $this->enviarNotificacionPaciente($datosCita, 'nueva_cita');
+
             // Notificar al médico
-            $this->enviarNotificacionMedico($datosCita, 'nueva_cita');
-            
-            return true;
+            $medicoNotificado = $this->enviarNotificacionMedico($datosCita, 'nueva_cita');
+
+            // Registrar en la base de datos
+            $this->registrarNotificacionesDB($datosCita, $citaId);
+
+            return $pacienteNotificado && $medicoNotificado;
         } catch (Exception $e) {
             error_log("Error notificando nueva cita: " . $e->getMessage());
             return false;
         }
     }
-    
+
+    private function registrarNotificacionesDB($datosCita, $citaId) {
+        try {
+            // Notificación para el paciente
+            $sqlPaciente = "INSERT INTO notificaciones (
+                id_usuario_destinatario,
+                tipo_notificacion,
+                titulo,
+                mensaje,
+                id_referencia,
+                fecha_envio,
+                enviada_email
+            ) VALUES (
+                :id_paciente,
+                'cita_agendada',
+                'Cita Médica Agendada',
+                CONCAT('Su cita con Dr(a). ', :medico_nombre, ' ', :medico_apellido, ' ha sido agendada para el ', DATE_FORMAT(:fecha_cita, '%d/%m/%Y'), ' a las ', TIME_FORMAT(:hora_cita, '%H:%i')),
+                :cita_id,
+                NOW(),
+                1
+            )";
+
+            $stmtPaciente = $this->db->prepare($sqlPaciente);
+            $stmtPaciente->execute([
+                'id_paciente' => $datosCita['id_paciente'],
+                'medico_nombre' => $datosCita['medico_nombre'],
+                'medico_apellido' => $datosCita['medico_apellido'],
+                'fecha_cita' => $datosCita['fecha_cita'],
+                'hora_cita' => $datosCita['hora_cita'],
+                'cita_id' => $citaId
+            ]);
+
+            // Notificación para el médico
+            $sqlMedico = "INSERT INTO notificaciones (
+                id_usuario_destinatario,
+                tipo_notificacion,
+                titulo,
+                mensaje,
+                id_referencia,
+                fecha_envio,
+                enviada_email
+            ) VALUES (
+                :id_medico,
+                'sistema',
+                'Nueva Cita Asignada',
+                CONCAT('Se ha asignado una nueva cita para el ', DATE_FORMAT(:fecha_cita, '%d/%m/%Y'), ' a las ', TIME_FORMAT(:hora_cita, '%H:%i'), ' con paciente ', :paciente_nombre, ' ', :paciente_apellido),
+                :cita_id,
+                NOW(),
+                1
+            )";
+
+            $stmtMedico = $this->db->prepare($sqlMedico);
+            $stmtMedico->execute([
+                'id_medico' => $datosCita['id_medico'],
+                'fecha_cita' => $datosCita['fecha_cita'],
+                'hora_cita' => $datosCita['hora_cita'],
+                'paciente_nombre' => $datosCita['paciente_nombre'],
+                'paciente_apellido' => $datosCita['paciente_apellido'],
+                'cita_id' => $citaId
+            ]);
+
+            return true;
+        } catch (Exception $e) {
+            error_log("Error registrando notificaciones en DB: " . $e->getMessage());
+            return false;
+        }
+    }
+
     /**
      * Enviar notificación cuando cambia el estado de una cita
      */
@@ -42,25 +117,25 @@ class NotificacionesCitas {
             if (!$datosCita) {
                 throw new Exception("Cita no encontrada");
             }
-            
+
             // Actualizar datos con el nuevo estado
             $datosCita['estado_anterior'] = $estadoAnterior;
             $datosCita['estado_nuevo'] = $estadoNuevo;
             $datosCita['motivo_cambio'] = $motivo;
-            
+
             // Notificar al paciente
             $this->enviarNotificacionPaciente($datosCita, 'cambio_estado');
-            
+
             // Notificar al médico
             $this->enviarNotificacionMedico($datosCita, 'cambio_estado');
-            
+
             return true;
         } catch (Exception $e) {
             error_log("Error notificando cambio de estado: " . $e->getMessage());
             return false;
         }
     }
-    
+
     /**
      * Obtener datos completos de la cita
      */
@@ -81,78 +156,78 @@ class NotificacionesCitas {
                 JOIN especialidades e ON c.id_especialidad = e.id_especialidad
                 JOIN sucursales s ON c.id_sucursal = s.id_sucursal
                 WHERE c.id_cita = :cita_id";
-        
+
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['cita_id' => $citaId]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
-    
+
     /**
      * Enviar notificación al paciente
      */
-    private function enviarNotificacionPaciente($datosCita, $tipoNotificacion) {
+    public function enviarNotificacionPaciente($datosCita, $tipoNotificacion) {
         if (empty($datosCita['paciente_email'])) {
             return false;
         }
-        
+
         $nombrePaciente = $datosCita['paciente_nombre'] . ' ' . $datosCita['paciente_apellido'];
-        
+
         switch ($tipoNotificacion) {
             case 'nueva_cita':
                 $titulo = "Cita Médica Agendada - Clínica SJ";
                 $mensaje = $this->generarMensajePacienteNuevaCita($datosCita);
                 break;
-                
+
             case 'cambio_estado':
                 $titulo = "Actualización de su Cita Médica - Clínica SJ";
                 $mensaje = $this->generarMensajePacienteCambioEstado($datosCita);
                 break;
-                
+
             default:
                 return false;
         }
-        
+
         return enviarEmailNotificacion(
-            $datosCita['paciente_email'], 
-            $nombrePaciente, 
-            $titulo, 
-            $mensaje
+                $datosCita['paciente_email'],
+                $nombrePaciente,
+                $titulo,
+                $mensaje
         );
     }
-    
+
     /**
      * Enviar notificación al médico
      */
-    private function enviarNotificacionMedico($datosCita, $tipoNotificacion) {
+    public function enviarNotificacionMedico($datosCita, $tipoNotificacion) {
         if (empty($datosCita['medico_email'])) {
             return false;
         }
-        
+
         $nombreMedico = 'Dr(a). ' . $datosCita['medico_nombre'] . ' ' . $datosCita['medico_apellido'];
-        
+
         switch ($tipoNotificacion) {
             case 'nueva_cita':
                 $titulo = "Nueva Cita Asignada - Clínica SJ";
                 $mensaje = $this->generarMensajeMedicoNuevaCita($datosCita);
                 break;
-                
+
             case 'cambio_estado':
                 $titulo = "Actualización de Cita - Clínica SJ";
                 $mensaje = $this->generarMensajeMedicoCambioEstado($datosCita);
                 break;
-                
+
             default:
                 return false;
         }
-        
+
         return enviarEmailNotificacion(
-            $datosCita['medico_email'], 
-            $nombreMedico, 
-            $titulo, 
-            $mensaje
+                $datosCita['medico_email'],
+                $nombreMedico,
+                $titulo,
+                $mensaje
         );
     }
-    
+
     /**
      * Generar mensaje para paciente - nueva cita
      */
@@ -160,7 +235,7 @@ class NotificacionesCitas {
         $fechaFormateada = date('d/m/Y', strtotime($datos['fecha_cita']));
         $horaFormateada = date('H:i', strtotime($datos['hora_cita']));
         $medico = 'Dr(a). ' . $datos['medico_nombre'] . ' ' . $datos['medico_apellido'];
-        
+
         return "
         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;'>
             <div style='background: #007bff; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;'>
@@ -206,7 +281,7 @@ class NotificacionesCitas {
             </div>
         </div>";
     }
-    
+
     /**
      * Generar mensaje para médico - nueva cita
      */
@@ -214,7 +289,7 @@ class NotificacionesCitas {
         $fechaFormateada = date('d/m/Y', strtotime($datos['fecha_cita']));
         $horaFormateada = date('H:i', strtotime($datos['hora_cita']));
         $paciente = $datos['paciente_nombre'] . ' ' . $datos['paciente_apellido'];
-        
+
         return "
         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;'>
             <div style='background: #28a745; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;'>
@@ -250,7 +325,7 @@ class NotificacionesCitas {
             </div>
         </div>";
     }
-    
+
     /**
      * Generar mensaje para paciente - cambio de estado
      */
@@ -259,7 +334,7 @@ class NotificacionesCitas {
         $horaFormateada = date('H:i', strtotime($datos['hora_cita']));
         $estadoAnterior = ucwords(str_replace('_', ' ', $datos['estado_anterior']));
         $estadoNuevo = ucwords(str_replace('_', ' ', $datos['estado_nuevo']));
-        
+
         // Color según el estado
         $colorEstado = [
             'confirmada' => '#28a745',
@@ -268,7 +343,7 @@ class NotificacionesCitas {
             'no_asistio' => '#6c757d'
         ];
         $color = $colorEstado[$datos['estado_nuevo']] ?? '#007bff';
-        
+
         $mensaje = "
         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;'>
             <div style='background: {$color}; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;'>
@@ -293,27 +368,25 @@ class NotificacionesCitas {
                     <p><strong>👨‍⚕️ Médico:</strong> Dr(a). {$datos['medico_nombre']} {$datos['medico_apellido']}</p>
                     <p><strong>🏥 Especialidad:</strong> {$datos['nombre_especialidad']}</p>
                 </div>";
-        
+
         // Mensaje específico según el estado
         if ($datos['estado_nuevo'] === 'cancelada') {
             $mensaje .= "
                 <div style='background: #f8d7da; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc3545;'>
                     <h4 style='color: #721c24; margin-top: 0;'>❌ Cita Cancelada</h4>
                     <p style='color: #721c24;'>Su cita ha sido cancelada.</p>";
-            
+
             if (!empty($datos['motivo_cambio'])) {
                 $mensaje .= "<p style='color: #721c24;'><strong>Motivo:</strong> {$datos['motivo_cambio']}</p>";
             }
-            
+
             $mensaje .= "<p style='color: #721c24;'>Si desea reagendar, por favor contáctenos.</p></div>";
-            
         } elseif ($datos['estado_nuevo'] === 'confirmada') {
             $mensaje .= "
                 <div style='background: #d4edda; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;'>
                     <h4 style='color: #155724; margin-top: 0;'>✅ Cita Confirmada</h4>
                     <p style='color: #155724;'>Su cita ha sido confirmada. No olvide asistir en la fecha y hora programada.</p>
                 </div>";
-                
         } elseif ($datos['estado_nuevo'] === 'completada') {
             $mensaje .= "
                 <div style='background: #d1ecf1; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #17a2b8;'>
@@ -321,7 +394,7 @@ class NotificacionesCitas {
                     <p style='color: #0c5460;'>Su cita médica ha sido completada satisfactoriamente.</p>
                 </div>";
         }
-        
+
         $mensaje .= "
                 <p style='text-align: center; margin-top: 30px;'>
                     <strong>Para más información, contáctenos:</strong><br>
@@ -330,10 +403,10 @@ class NotificacionesCitas {
                 </p>
             </div>
         </div>";
-        
+
         return $mensaje;
     }
-    
+
     /**
      * Generar mensaje para médico - cambio de estado
      */
@@ -343,7 +416,7 @@ class NotificacionesCitas {
         $estadoAnterior = ucwords(str_replace('_', ' ', $datos['estado_anterior']));
         $estadoNuevo = ucwords(str_replace('_', ' ', $datos['estado_nuevo']));
         $paciente = $datos['paciente_nombre'] . ' ' . $datos['paciente_apellido'];
-        
+
         return "
         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;'>
             <div style='background: #6c757d; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;'>
@@ -373,4 +446,5 @@ class NotificacionesCitas {
         </div>";
     }
 }
+
 ?>
