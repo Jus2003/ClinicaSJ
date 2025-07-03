@@ -16,7 +16,7 @@ $fechaInicio = $_GET['fecha_inicio'] ?? date('Y-m-d', strtotime('-7 days'));
 $fechaFin = $_GET['fecha_fin'] ?? date('Y-m-d', strtotime('+200 days'));
 $estado_filter = $_GET['estado'] ?? 'todas';
 
-// Procesar acciones
+// Procesar acciones (mantener igual)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $citaId = $_POST['cita_id'] ?? 0;
@@ -28,7 +28,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         switch ($action) {
             case 'confirmar_cita':
-                // Obtener estado anterior
                 $sqlEstado = "SELECT estado_cita FROM citas WHERE id_cita = :cita_id";
                 $stmtEstado = $db->prepare($sqlEstado);
                 $stmtEstado->execute(['cita_id' => $citaId]);
@@ -36,7 +35,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $citaModel->updateEstadoCita($citaId, 'confirmada');
 
-                // Enviar notificaciones
                 try {
                     require_once 'includes/notificaciones-citas.php';
                     $notificador = new NotificacionesCitas($db);
@@ -50,8 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'cancelar_cita':
                 $motivo = $_POST['motivo_cancelacion'] ?? 'Cancelada por el usuario';
-
-                // Obtener estado anterior
                 $sqlEstado = "SELECT estado_cita FROM citas WHERE id_cita = :cita_id";
                 $stmtEstado = $db->prepare($sqlEstado);
                 $stmtEstado->execute(['cita_id' => $citaId]);
@@ -59,7 +55,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $citaModel->updateEstadoCita($citaId, 'cancelada', $motivo);
 
-                // Enviar notificaciones
                 try {
                     require_once 'includes/notificaciones-citas.php';
                     $notificador = new NotificacionesCitas($db);
@@ -73,8 +68,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'completar_cita':
                 $observaciones = $_POST['observaciones'] ?? '';
-
-                // Obtener estado anterior
                 $sqlEstado = "SELECT estado_cita FROM citas WHERE id_cita = :cita_id";
                 $stmtEstado = $db->prepare($sqlEstado);
                 $stmtEstado->execute(['cita_id' => $citaId]);
@@ -82,7 +75,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $citaModel->updateEstadoCita($citaId, 'completada', $observaciones);
 
-                // Enviar notificaciones
                 try {
                     require_once 'includes/notificaciones-citas.php';
                     $notificador = new NotificacionesCitas($db);
@@ -99,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Obtener citas según rol - CONSULTA DIRECTA SIN USAR MÉTODOS COMPLEJOS
+// NUEVA CONSULTA SIMPLIFICADA PASO A PASO
 require_once 'config/database.php';
 $database = new Database();
 $db = $database->getConnection();
@@ -108,89 +100,126 @@ $citas = [];
 $tituloAgenda = "Agenda";
 $vistaRol = "general";
 
-// Construir consulta base según rol
-$whereConditions = [];
-$params = [];
+try {
+    // PASO 1: Construir filtros básicos
+    $whereConditions = [];
+    $params = [];
 
-// Filtros de fecha
-$whereConditions[] = "c.fecha_cita BETWEEN :fecha_inicio AND :fecha_fin";
-$params['fecha_inicio'] = $fechaInicio;
-$params['fecha_fin'] = $fechaFin;
+    // Filtros de fecha
+    $whereConditions[] = "c.fecha_cita BETWEEN :fecha_inicio AND :fecha_fin";
+    $params['fecha_inicio'] = $fechaInicio;
+    $params['fecha_fin'] = $fechaFin;
 
-// Filtro de estado
-if ($estado_filter !== 'todas') {
-    $whereConditions[] = "c.estado_cita = :estado";
-    $params['estado'] = $estado_filter;
-}
+    // Filtro de estado
+    if ($estado_filter !== 'todas') {
+        $whereConditions[] = "c.estado_cita = :estado";
+        $params['estado'] = $estado_filter;
+    }
 
-switch ($_SESSION['role_id']) {
-    case 3: // Médico
-        $whereConditions[] = "c.id_medico = :user_id";
-        $params['user_id'] = $_SESSION['user_id'];
-        $tituloAgenda = "Mi Agenda";
-        $vistaRol = "medico";
-        break;
+    // PASO 2: Agregar filtros por rol
+    switch ($_SESSION['role_id']) {
+        case 3: // Médico
+            $whereConditions[] = "c.id_medico = :user_id";
+            $params['user_id'] = $_SESSION['user_id'];
+            $tituloAgenda = "Mi Agenda";
+            $vistaRol = "medico";
+            break;
 
-    case 4: // Paciente
-        $whereConditions[] = "c.id_paciente = :user_id";
-        $params['user_id'] = $_SESSION['user_id'];
-        $tituloAgenda = "Mis Citas";
-        $vistaRol = "paciente";
-        break;
+        case 4: // Paciente
+            $whereConditions[] = "c.id_paciente = :user_id";
+            $params['user_id'] = $_SESSION['user_id'];
+            $tituloAgenda = "Mis Citas";
+            $vistaRol = "paciente";
+            break;
 
-    default: // Admin/Recepcionista
-        $tituloAgenda = "Agenda General";
-        $vistaRol = "admin";
-        break;
-}
+        default: // Admin/Recepcionista
+            $tituloAgenda = "Agenda General";
+            $vistaRol = "admin";
+            break;
+    }
 
-$whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
+    $whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
 
-// Consulta SQL simplificada para evitar duplicados
-$sql = "SELECT DISTINCT 
-            c.id_cita,
-            c.fecha_cita,
-            c.hora_cita,
-            c.estado_cita,
-            c.tipo_cita,
-            c.motivo_consulta,
-            c.observaciones,
-            CONCAT(p.nombre, ' ', p.apellido) as paciente_nombre,
-            p.cedula as paciente_cedula,
-            p.telefono as paciente_telefono,
-            CONCAT(m.nombre, ' ', m.apellido) as medico_nombre,
-            e.nombre_especialidad,
-            s.nombre_sucursal
-        FROM citas c
-        JOIN usuarios p ON c.id_paciente = p.id_usuario
-        JOIN usuarios m ON c.id_medico = m.id_usuario
-        JOIN especialidades e ON c.id_especialidad = e.id_especialidad
-        JOIN sucursales s ON c.id_sucursal = s.id_sucursal
-        {$whereClause}
-        ORDER BY c.fecha_cita ASC, c.hora_cita ASC";
+    // PASO 3: CONSULTA PRINCIPAL ULTRA SIMPLIFICADA
+    $sql = "SELECT 
+                c.id_cita,
+                c.fecha_cita,
+                c.hora_cita,
+                c.estado_cita,
+                c.tipo_cita,
+                c.motivo_consulta,
+                c.observaciones,
+                c.id_paciente,
+                c.id_medico,
+                c.id_especialidad,
+                c.id_sucursal
+            FROM citas c
+            {$whereClause}
+            ORDER BY c.fecha_cita ASC, c.hora_cita ASC";
 
-$stmt = $db->prepare($sql);
-$stmt->execute($params);
-$citas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    $citasBase = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Agregar información de triaje y pagos SOLO si hay citas
-if (!empty($citas) && ($vistaRol === 'paciente' || $vistaRol === 'medico')) {
-    foreach ($citas as &$cita) {
-        // Verificar triaje completado
+// Obtener datos de triaje y pago para TODAS las vistas (no solo pacientes y médicos)
+    foreach ($citasBase as $cita) {
+        $citaCompleta = $cita;
+
+        // Obtener datos del paciente
+        $sqlPaciente = "SELECT CONCAT(nombre, ' ', apellido) as nombre_completo, cedula, telefono 
+                    FROM usuarios WHERE id_usuario = :id_paciente";
+        $stmtPaciente = $db->prepare($sqlPaciente);
+        $stmtPaciente->execute(['id_paciente' => $cita['id_paciente']]);
+        $paciente = $stmtPaciente->fetch(PDO::FETCH_ASSOC);
+
+        // Obtener datos del médico
+        $sqlMedico = "SELECT CONCAT(nombre, ' ', apellido) as nombre_completo 
+                  FROM usuarios WHERE id_usuario = :id_medico";
+        $stmtMedico = $db->prepare($sqlMedico);
+        $stmtMedico->execute(['id_medico' => $cita['id_medico']]);
+        $medico = $stmtMedico->fetch(PDO::FETCH_ASSOC);
+
+        // Obtener especialidad
+        $sqlEspecialidad = "SELECT nombre_especialidad FROM especialidades WHERE id_especialidad = :id_especialidad";
+        $stmtEspecialidad = $db->prepare($sqlEspecialidad);
+        $stmtEspecialidad->execute(['id_especialidad' => $cita['id_especialidad']]);
+        $especialidad = $stmtEspecialidad->fetch(PDO::FETCH_ASSOC);
+
+        // Obtener sucursal
+        $sqlSucursal = "SELECT nombre_sucursal FROM sucursales WHERE id_sucursal = :id_sucursal";
+        $stmtSucursal = $db->prepare($sqlSucursal);
+        $stmtSucursal->execute(['id_sucursal' => $cita['id_sucursal']]);
+        $sucursal = $stmtSucursal->fetch(PDO::FETCH_ASSOC);
+
+        // Combinar datos
+        $citaCompleta['paciente_nombre'] = $paciente ? $paciente['nombre_completo'] : 'N/A';
+        $citaCompleta['paciente_cedula'] = $paciente ? $paciente['cedula'] : '';
+        $citaCompleta['paciente_telefono'] = $paciente ? $paciente['telefono'] : '';
+        $citaCompleta['medico_nombre'] = $medico ? $medico['nombre_completo'] : 'N/A';
+        $citaCompleta['nombre_especialidad'] = $especialidad ? $especialidad['nombre_especialidad'] : 'N/A';
+        $citaCompleta['nombre_sucursal'] = $sucursal ? $sucursal['nombre_sucursal'] : 'N/A';
+
+        // OBTENER DATOS DE TRIAJE Y PAGO PARA TODOS (cambiado)
+        // Triaje
         $sqlTriaje = "SELECT COUNT(*) as total FROM triaje_respuestas 
-                      WHERE id_cita = :cita_id AND tipo_triaje = 'digital'";
+                  WHERE id_cita = :cita_id AND tipo_triaje = 'digital'";
         $stmtTriaje = $db->prepare($sqlTriaje);
         $stmtTriaje->execute(['cita_id' => $cita['id_cita']]);
         $triaje = $stmtTriaje->fetch(PDO::FETCH_ASSOC);
-        $cita['triaje_completado'] = $triaje['total'] > 0;
+        $citaCompleta['triaje_completado'] = ($triaje && $triaje['total'] > 0);
 
-        // Verificar estado de pago
-        $sqlPago = "SELECT estado_pago FROM pagos WHERE id_cita = :cita_id LIMIT 1";
+        // Pago
+        $sqlPago = "SELECT estado_pago FROM pagos WHERE id_cita = :cita_id ORDER BY id_pago DESC LIMIT 1";
         $stmtPago = $db->prepare($sqlPago);
         $stmtPago->execute(['cita_id' => $cita['id_cita']]);
         $pago = $stmtPago->fetch(PDO::FETCH_ASSOC);
-        $cita['estado_pago'] = $pago ? $pago['estado_pago'] : 'pendiente';
+        $citaCompleta['estado_pago'] = $pago ? $pago['estado_pago'] : 'pendiente';
+
+        $citas[] = $citaCompleta;
     }
+} catch (Exception $e) {
+    $error = "Error al obtener las citas: " . $e->getMessage();
+    $citas = [];
 }
 
 include 'views/includes/header.php';
@@ -202,19 +231,19 @@ include 'views/includes/navbar.php';
 
     <?php if ($error): ?>
         <div class="alert alert-danger alert-dismissible fade show">
-            <i class="fas fa-exclamation-triangle"></i> <?= $error ?>
+            <i class="fas fa-exclamation-triangle"></i> <?= htmlspecialchars($error) ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
 
     <?php if ($success): ?>
         <div class="alert alert-success alert-dismissible fade show">
-            <i class="fas fa-check-circle"></i> <?= $success ?>
+            <i class="fas fa-check-circle"></i> <?= htmlspecialchars($success) ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
 
-    <!-- Filtros simplificados -->
+    <!-- Filtros -->
     <div class="card mb-3">
         <div class="card-body">
             <form method="GET" class="row">
@@ -222,12 +251,12 @@ include 'views/includes/navbar.php';
 
                 <div class="col-md-4 mb-2">
                     <label>Fecha Inicio</label>
-                    <input type="date" class="form-control" name="fecha_inicio" value="<?= $fechaInicio ?>">
+                    <input type="date" class="form-control" name="fecha_inicio" value="<?= htmlspecialchars($fechaInicio) ?>">
                 </div>
 
                 <div class="col-md-4 mb-2">
                     <label>Fecha Fin</label>
-                    <input type="date" class="form-control" name="fecha_fin" value="<?= $fechaFin ?>">
+                    <input type="date" class="form-control" name="fecha_fin" value="<?= htmlspecialchars($fechaFin) ?>">
                 </div>
 
                 <div class="col-md-4 mb-2">
@@ -250,6 +279,14 @@ include 'views/includes/navbar.php';
         </div>
     </div>
 
+    <!-- Debug temporal -->
+    <div class="alert alert-info">
+        <strong>Debug:</strong> 
+        Total citas únicas encontradas: <?= count($citas) ?> | 
+        Role ID: <?= $_SESSION['role_id'] ?> | 
+        Vista: <?= $vistaRol ?>
+    </div>
+
     <!-- Lista de citas -->
     <div class="card">
         <div class="card-header">
@@ -270,6 +307,7 @@ include 'views/includes/navbar.php';
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
                             <tr>
+                                <th>ID</th>
                                 <th>Fecha/Hora</th>
                                 <?php if ($vistaRol === 'medico'): ?>
                                     <th>Paciente</th>
@@ -289,8 +327,12 @@ include 'views/includes/navbar.php';
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($citas as $cita): ?>
+                            <?php foreach ($citas as $index => $cita): ?>
                                 <tr>
+                                    <td>
+                                        <small class="text-muted">#<?= $cita['id_cita'] ?></small>
+                                        <small class="text-info d-block">[<?= $index + 1 ?>]</small>
+                                    </td>
                                     <td>
                                         <strong><?= date('d/m/Y', strtotime($cita['fecha_cita'])) ?></strong>
                                         <br>
@@ -334,49 +376,42 @@ include 'views/includes/navbar.php';
                                     <?php if ($vistaRol === 'paciente' || $vistaRol === 'medico'): ?>
                                         <!-- Columna Triaje -->
                                         <td>
-                                            <?php if ($vistaRol === 'paciente'): ?>
-                                                <?php if ($cita['estado_cita'] === 'confirmada'): ?>
-                                                    <?php if ($cita['triaje_completado']): ?>
-                                                        <span class="badge bg-success">
-                                                            <i class="fas fa-check"></i> Hecho
-                                                        </span>
-                                                    <?php else: ?>
-                                                        <span class="badge bg-warning">
-                                                            <i class="fas fa-clock"></i> Pendiente
-                                                        </span>
-                                                    <?php endif; ?>
-                                                <?php else: ?>
-                                                    <span class="text-muted">-</span>
-                                                <?php endif; ?>
-                                            <?php elseif ($vistaRol === 'medico'): ?>
+                                            <?php if (isset($cita['triaje_completado'])): ?>
                                                 <?php if ($cita['triaje_completado']): ?>
                                                     <span class="badge bg-success">
-                                                        <i class="fas fa-check"></i> Disponible
+                                                        <i class="fas fa-check"></i> Completado
                                                     </span>
                                                 <?php else: ?>
-                                                    <span class="badge bg-light text-dark">
-                                                        <i class="fas fa-minus"></i> Sin triaje
+                                                    <span class="badge bg-warning">
+                                                        <i class="fas fa-clock"></i> Pendiente
                                                     </span>
                                                 <?php endif; ?>
+                                            <?php else: ?>
+                                                <span class="text-muted">-</span>
                                             <?php endif; ?>
                                         </td>
 
                                         <!-- Columna Pago -->
                                         <td>
-                                            <?php
-                                            $pagoClass = match ($cita['estado_pago']) {
-                                                'pagado' => 'bg-success',
-                                                'pendiente' => 'bg-danger',
-                                                default => 'bg-danger'
-                                            };
-                                            ?>
-                                            <span class="badge <?= $pagoClass ?>">
-                                                <i class="fas fa-<?= $cita['estado_pago'] === 'pagado' ? 'check' : 'dollar-sign' ?>"></i>
-                                                <?= ucfirst($cita['estado_pago']) ?>
-                                            </span>
+                                            <?php if (isset($cita['estado_pago'])): ?>
+                                                <?php
+                                                $pagoClass = match ($cita['estado_pago']) {
+                                                    'pagado' => 'bg-success',
+                                                    'pendiente' => 'bg-danger',
+                                                    default => 'bg-danger'
+                                                };
+                                                ?>
+                                                <span class="badge <?= $pagoClass ?>">
+                                                    <i class="fas fa-<?= $cita['estado_pago'] === 'pagado' ? 'check' : 'dollar-sign' ?>"></i>
+                                                    <?= ucfirst($cita['estado_pago']) ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="text-muted">-</span>
+                                            <?php endif; ?>
                                         </td>
                                     <?php endif; ?>
 
+                                    <!-- Columna Acciones -->
                                     <!-- Columna Acciones -->
                                     <td>
                                         <div class="btn-group btn-group-sm">
@@ -385,7 +420,7 @@ include 'views/includes/navbar.php';
                                                 <!-- Botones para Pacientes -->
 
                                                 <!-- Triaje Digital -->
-                                                <?php if ($cita['estado_cita'] === 'confirmada' && !$cita['triaje_completado']): ?>
+                                                <?php if ($cita['estado_cita'] === 'confirmada' && isset($cita['triaje_completado']) && !$cita['triaje_completado']): ?>
                                                     <a href="index.php?action=consultas/triaje/completar&cita_id=<?= $cita['id_cita'] ?>" 
                                                        class="btn btn-success btn-sm" title="Completar Triaje">
                                                         <i class="fas fa-clipboard-list"></i>
@@ -393,7 +428,7 @@ include 'views/includes/navbar.php';
                                                 <?php endif; ?>
 
                                                 <!-- Pago -->
-                                                <?php if ($cita['estado_pago'] === 'pendiente' && in_array($cita['estado_cita'], ['confirmada', 'completada'])): ?>
+                                                <?php if (isset($cita['estado_pago']) && $cita['estado_pago'] === 'pendiente' && in_array($cita['estado_cita'], ['confirmada', 'completada'])): ?>
                                                     <a href="index.php?action=citas/pagar&cita_id=<?= $cita['id_cita'] ?>" 
                                                        class="btn btn-warning btn-sm" title="Pagar">
                                                         <i class="fas fa-credit-card"></i>
@@ -404,8 +439,8 @@ include 'views/includes/navbar.php';
                                                 <!-- Botones para Médicos -->
 
                                                 <!-- Ver Triaje -->
-                                                <?php if ($cita['triaje_completado']): ?>
-                                                    <a href="index.php?action=consultas/triaje/ver&cita_id=<?= $cita['id_cita'] ?>" 
+                                                <?php if (isset($cita['triaje_completado']) && $cita['triaje_completado']): ?>
+                                                    <a href="index.php?action=consultas/triaje/ver_respuestas&cita_id=<?= $cita['id_cita'] ?>" 
                                                        class="btn btn-info btn-sm" title="Ver Triaje">
                                                         <i class="fas fa-clipboard-list"></i>
                                                     </a>
@@ -431,7 +466,7 @@ include 'views/includes/navbar.php';
 
                                             <!-- Botón Ver Detalles (para todos) -->
                                             <button class="btn btn-outline-info btn-sm" 
-                                                    onclick="verDetallesCita(<?= $cita['id_cita'] ?>, '<?= addslashes(json_encode($cita)) ?>')" 
+                                                    onclick="verDetallesCita(<?= $cita['id_cita'] ?>, '<?= htmlspecialchars(json_encode($cita), ENT_QUOTES) ?>')" 
                                                     title="Ver Detalles">
                                                 <i class="fas fa-eye"></i>
                                             </button>
@@ -466,6 +501,7 @@ include 'views/includes/navbar.php';
     </div>
 </div>
 
+<!-- Los modales permanecen igual... -->
 <!-- Modal Detalles -->
 <div class="modal fade" id="modalDetalles">
     <div class="modal-dialog modal-lg">
@@ -551,9 +587,15 @@ include 'views/includes/navbar.php';
 </div>
 
 <script>
-// Función para ver detalles
+// JavaScript igual al anterior...
     function verDetallesCita(citaId, citaData) {
-        const cita = JSON.parse(citaData);
+        let cita;
+        try {
+            cita = JSON.parse(citaData);
+        } catch (e) {
+            console.error('Error parsing cita data:', e);
+            return;
+        }
 
         const content = `
         <div class="row">
@@ -617,13 +659,11 @@ include 'views/includes/navbar.php';
         new bootstrap.Modal(document.getElementById('modalDetalles')).show();
     }
 
-// Función para cancelar cita
     function cancelarCita(citaId) {
         document.getElementById('citaCancelarId').value = citaId;
         new bootstrap.Modal(document.getElementById('modalCancelar')).show();
     }
 
-// Función para completar cita
     function completarCita(citaId) {
         document.getElementById('citaCompletarId').value = citaId;
         new bootstrap.Modal(document.getElementById('modalCompletar')).show();
@@ -640,7 +680,6 @@ include 'views/includes/navbar.php';
                     const originalText = submitButton.innerHTML;
                     submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
 
-                    // Rehabilitar después de 3 segundos por si hay error
                     setTimeout(() => {
                         submitButton.disabled = false;
                         submitButton.innerHTML = originalText;
@@ -650,55 +689,3 @@ include 'views/includes/navbar.php';
         });
     });
 </script>
-
-<style>
-    .table td {
-        vertical-align: middle;
-    }
-
-    .badge {
-        font-size: 0.75rem;
-        padding: 0.35rem 0.65rem;
-    }
-
-    .btn-group-sm .btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
-        margin-right: 0.1rem;
-    }
-
-    /* Mejorar hover de botones */
-    .btn:hover {
-        transform: translateY(-1px);
-        transition: all 0.2s ease;
-    }
-
-    /* Badges con iconos */
-    .badge i {
-        margin-right: 0.25rem;
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-        .btn-group-sm .btn {
-            padding: 0.2rem 0.4rem;
-            font-size: 0.7rem;
-        }
-
-        .badge {
-            font-size: 0.65rem;
-        }
-    }
-
-    /* Animaciones suaves */
-    .table-hover tbody tr:hover {
-        background-color: rgba(0,123,255,0.075);
-        transition: background-color 0.2s ease;
-    }
-
-    /* Mejorar contraste de badges */
-    .badge.bg-light {
-        color: #495057 !important;
-        border: 1px solid #dee2e6;
-    }
-</style>

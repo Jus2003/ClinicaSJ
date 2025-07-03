@@ -26,6 +26,8 @@ if ($citaId) {
     if ($triajeModel->tieneTriajeCompletado($citaId)) {
         $success = "El triaje para esta cita ya ha sido completado.";
         $citaSeleccionada = $citaId;
+    } else {
+        $citaSeleccionada = $citaId;
     }
 }
 
@@ -101,48 +103,42 @@ include 'views/includes/navbar.php';
                 </div>
             <?php endif; ?>
 
-            <?php if (empty($citasPendientes) && !$citaSeleccionada): ?>
-                <!-- Sin citas pendientes -->
+            <?php if (empty($citaSeleccionada)): ?>
+                <!-- Mostrar citas pendientes -->
                 <div class="card border-0 shadow">
-                    <div class="card-body text-center py-5">
-                        <i class="fas fa-calendar-check text-muted" style="font-size: 4rem;"></i>
-                        <h4 class="mt-3 text-muted">No hay citas pendientes de triaje</h4>
-                        <p class="text-muted">Cuando tenga citas confirmadas, podrá completar el triaje digital aquí.</p>
-                        <a href="index.php?action=citas/agendar" class="btn btn-primary">
-                            <i class="fas fa-calendar-plus"></i> Agendar Nueva Cita
-                        </a>
-                    </div>
-                </div>
-                
-            <?php elseif (!$citaSeleccionada): ?>
-                <!-- Selección de cita -->
-                <div class="card border-0 shadow">
-                    <div class="card-header bg-primary text-white">
+                    <div class="card-header bg-gradient-primary text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-calendar-alt"></i> Seleccione la cita para completar el triaje
+                            <i class="fas fa-calendar-alt"></i> Citas Pendientes de Triaje
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            <?php foreach ($citasPendientes as $cita): ?>
-                                <div class="col-md-6 mb-3">
-                                    <div class="card border-primary">
-                                        <div class="card-body">
-                                            <h6 class="text-primary"><?php echo $cita['nombre_especialidad']; ?></h6>
-                                            <p class="mb-1"><strong>Médico:</strong> <?php echo $cita['medico_nombre']; ?></p>
-                                            <p class="mb-1"><strong>Fecha:</strong> <?php echo date('d/m/Y', strtotime($cita['fecha_cita'])); ?></p>
-                                            <p class="mb-1"><strong>Hora:</strong> <?php echo date('H:i', strtotime($cita['hora_cita'])); ?></p>
-                                            <p class="mb-3"><strong>Sucursal:</strong> <?php echo $cita['nombre_sucursal']; ?></p>
-                                            
-                                            <a href="index.php?action=consultas/triaje/completar&cita_id=<?php echo $cita['id_cita']; ?>" 
-                                               class="btn btn-primary btn-sm">
-                                                <i class="fas fa-clipboard-list"></i> Completar Triaje
-                                            </a>
+                        <?php if (!empty($citasPendientes)): ?>
+                            <div class="row">
+                                <?php foreach ($citasPendientes as $cita): ?>
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card border-start border-primary border-4">
+                                            <div class="card-body">
+                                                <p class="mb-1"><strong>Especialidad:</strong> <?php echo $cita['nombre_especialidad']; ?></p>
+                                                <p class="mb-1"><strong>Médico:</strong> <?php echo $cita['medico_nombre']; ?></p>
+                                                <p class="mb-1"><strong>Fecha:</strong> <?php echo date('d/m/Y', strtotime($cita['fecha_cita'])); ?></p>
+                                                <p class="mb-1"><strong>Hora:</strong> <?php echo date('H:i', strtotime($cita['hora_cita'])); ?></p>
+                                                <p class="mb-3"><strong>Sucursal:</strong> <?php echo $cita['nombre_sucursal']; ?></p>
+                                                
+                                                <a href="index.php?action=consultas/triaje/completar&cita_id=<?php echo $cita['id_cita']; ?>" 
+                                                   class="btn btn-primary btn-sm">
+                                                    <i class="fas fa-clipboard-list"></i> Completar Triaje
+                                                </a>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center text-muted">
+                                <i class="fas fa-calendar-check fa-3x mb-3"></i>
+                                <p>No tiene citas pendientes de triaje.</p>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
                 
@@ -171,7 +167,7 @@ include 'views/includes/navbar.php';
                                 </div>
                             <?php endforeach; ?>
                             
-                            <div class="text-center">
+                            <div class="text-center mt-4">
                                 <a href="index.php?action=consultas/triaje/completar" class="btn btn-secondary">
                                     <i class="fas fa-arrow-left"></i> Volver a Mis Citas
                                 </a>
@@ -179,112 +175,97 @@ include 'views/includes/navbar.php';
                         </div>
                         
                     <?php else: ?>
-                        <!-- Formulario para completar -->
+                        <!-- Formulario para completar triaje -->
                         <form method="POST" id="triajeForm">
                             <input type="hidden" name="cita_id" value="<?php echo $citaSeleccionada; ?>">
                             
                             <div class="card-body">
-                                <?php foreach ($preguntas as $index => $pregunta): ?>
-                                    <div class="mb-4">
-                                        <label class="form-label fw-bold">
-                                            <?php echo ($index + 1) . '. ' . $pregunta['pregunta']; ?>
-                                            <?php if ($pregunta['requerida']): ?>
-                                                <span class="text-danger">*</span>
-                                            <?php endif; ?>
-                                        </label>
-                                        
-                                        <?php
-                                        $fieldName = "respuestas[{$pregunta['id_pregunta']}]";
-                                        $isRequired = $pregunta['requerida'] ? 'required' : '';
-                                        
-                                        switch ($pregunta['tipo_pregunta']):
-                                            case 'texto':
-                                        ?>
-                                                <input type="text" 
-                                                       class="form-control" 
-                                                       name="<?php echo $fieldName; ?>"
-                                                       <?php echo $isRequired; ?>
-                                                       placeholder="Escriba su respuesta...">
-                                        <?php
-                                                break;
-                                            case 'textarea':
-                                        ?>
-                                                <textarea class="form-control" 
-                                                         name="<?php echo $fieldName; ?>"
-                                                         rows="3"
-                                                         <?php echo $isRequired; ?>
-                                                         placeholder="Describa detalladamente..."></textarea>
-                                        <?php
-                                                break;
-                                            case 'numero':
-                                        ?>
+                                <?php if (!empty($preguntas)): ?>
+                                    <?php foreach ($preguntas as $index => $pregunta): ?>
+                                        <div class="mb-4">
+                                            <label class="form-label fw-bold">
+                                                <?php echo ($index + 1) . '. ' . $pregunta['pregunta']; ?>
+                                                <?php if ($pregunta['obligatoria']): ?>
+                                                    <span class="text-danger">*</span>
+                                                <?php endif; ?>
+                                            </label>
+                                            
+                                            <?php if ($pregunta['tipo_respuesta'] === 'texto'): ?>
+                                                <textarea name="respuestas[<?php echo $pregunta['id_pregunta']; ?>]" 
+                                                          class="form-control" 
+                                                          rows="3" 
+                                                          placeholder="Escriba su respuesta..."
+                                                          <?php echo $pregunta['obligatoria'] ? 'required' : ''; ?>></textarea>
+                                            
+                                            <?php elseif ($pregunta['tipo_respuesta'] === 'numero'): ?>
                                                 <input type="number" 
+                                                       name="respuestas[<?php echo $pregunta['id_pregunta']; ?>]" 
                                                        class="form-control" 
-                                                       name="<?php echo $fieldName; ?>"
-                                                       <?php echo $isRequired; ?>
-                                                       min="0"
-                                                       step="0.1"
-                                                       placeholder="Ingrese un número...">
-                                        <?php
-                                                break;
-                                            case 'select':
-                                                $opciones = json_decode($pregunta['opciones'], true) ?: [];
-                                        ?>
-                                                <select class="form-select" name="<?php echo $fieldName; ?>" <?php echo $isRequired; ?>>
-                                                    <option value="">Seleccione una opción...</option>
-                                                    <?php foreach ($opciones as $opcion): ?>
-                                                        <option value="<?php echo htmlspecialchars($opcion); ?>">
-                                                            <?php echo htmlspecialchars($opcion); ?>
-                                                        </option>
+                                                       placeholder="Ingrese un número"
+                                                       <?php echo $pregunta['obligatoria'] ? 'required' : ''; ?>>
+                                            
+                                            <?php elseif ($pregunta['tipo_respuesta'] === 'fecha'): ?>
+                                                <input type="date" 
+                                                       name="respuestas[<?php echo $pregunta['id_pregunta']; ?>]" 
+                                                       class="form-control"
+                                                       <?php echo $pregunta['obligatoria'] ? 'required' : ''; ?>>
+                                            
+                                            <?php elseif ($pregunta['tipo_respuesta'] === 'sino'): ?>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" 
+                                                           type="radio" 
+                                                           name="respuestas[<?php echo $pregunta['id_pregunta']; ?>]" 
+                                                           value="Sí" 
+                                                           id="si_<?php echo $pregunta['id_pregunta']; ?>"
+                                                           <?php echo $pregunta['obligatoria'] ? 'required' : ''; ?>>
+                                                    <label class="form-check-label" for="si_<?php echo $pregunta['id_pregunta']; ?>">
+                                                        Sí
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" 
+                                                           type="radio" 
+                                                           name="respuestas[<?php echo $pregunta['id_pregunta']; ?>]" 
+                                                           value="No" 
+                                                           id="no_<?php echo $pregunta['id_pregunta']; ?>"
+                                                           <?php echo $pregunta['obligatoria'] ? 'required' : ''; ?>>
+                                                    <label class="form-check-label" for="no_<?php echo $pregunta['id_pregunta']; ?>">
+                                                        No
+                                                    </label>
+                                                </div>
+                                            
+                                            <?php elseif ($pregunta['tipo_respuesta'] === 'seleccion' && !empty($pregunta['opciones'])): ?>
+                                                <select name="respuestas[<?php echo $pregunta['id_pregunta']; ?>]" 
+                                                        class="form-select"
+                                                        <?php echo $pregunta['obligatoria'] ? 'required' : ''; ?>>
+                                                    <option value="">Seleccione una opción</option>
+                                                    <?php 
+                                                    $opciones = explode(',', $pregunta['opciones']);
+                                                    foreach ($opciones as $opcion): ?>
+                                                        <option value="<?php echo trim($opcion); ?>"><?php echo trim($opcion); ?></option>
                                                     <?php endforeach; ?>
                                                 </select>
-                                        <?php
-                                                break;
-                                            case 'radio':
-                                                $opciones = json_decode($pregunta['opciones'], true) ?: [];
-                                        ?>
-                                                <div class="row">
-                                                    <?php foreach ($opciones as $i => $opcion): ?>
-                                                        <div class="col-md-6 mb-2">
-                                                            <div class="form-check">
-                                                                <input class="form-check-input" 
-                                                                       type="radio" 
-                                                                       name="<?php echo $fieldName; ?>" 
-                                                                       id="<?php echo $pregunta['id_pregunta'] . '_' . $i; ?>"
-                                                                       value="<?php echo htmlspecialchars($opcion); ?>"
-                                                                       <?php echo $isRequired; ?>>
-                                                                <label class="form-check-label" 
-                                                                       for="<?php echo $pregunta['id_pregunta'] . '_' . $i; ?>">
-                                                                    <?php echo htmlspecialchars($opcion); ?>
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                    <?php endforeach; ?>
-                                                </div>
-                                        <?php
-                                                break;
-                                        endswitch;
-                                        ?>
-                                        
-                                        <?php if ($pregunta['ayuda']): ?>
-                                            <div class="form-text">
-                                                <i class="fas fa-info-circle"></i> <?php echo $pregunta['ayuda']; ?>
-                                            </div>
-                                        <?php endif; ?>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <div class="text-center text-muted">
+                                        <i class="fas fa-clipboard-question fa-3x mb-3"></i>
+                                        <p>No hay preguntas de triaje configuradas.</p>
                                     </div>
-                                <?php endforeach; ?>
+                                <?php endif; ?>
                             </div>
                             
-                            <div class="card-footer bg-light">
-                                <div class="d-flex justify-content-between">
-                                    <a href="index.php?action=consultas/triaje/completar" class="btn btn-secondary">
-                                        <i class="fas fa-arrow-left"></i> Volver
+                            <?php if (!empty($preguntas)): ?>
+                                <div class="card-footer text-end">
+                                    <a href="index.php?action=consultas/triaje/completar" class="btn btn-secondary me-2">
+                                        <i class="fas fa-arrow-left"></i> Cancelar
                                     </a>
-                                    <button type="submit" class="btn btn-primary btn-lg">
+                                    <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-save"></i> Completar Triaje
                                     </button>
                                 </div>
-                            </div>
+                            <?php endif; ?>
                         </form>
                     <?php endif; ?>
                 </div>
@@ -292,31 +273,3 @@ include 'views/includes/navbar.php';
         </div>
     </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('triajeForm');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            // Validación adicional si es necesaria
-            const requiredFields = form.querySelectorAll('[required]');
-            let allValid = true;
-            
-            requiredFields.forEach(field => {
-                if (!field.value.trim()) {
-                    field.classList.add('is-invalid');
-                    allValid = false;
-                } else {
-                    field.classList.remove('is-invalid');
-                }
-            });
-            
-            if (!allValid) {
-                e.preventDefault();
-                alert('Por favor complete todos los campos requeridos');
-            }
-        });
-    }
-});
-</script>
-
