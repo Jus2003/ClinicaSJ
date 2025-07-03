@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Enviar notificaciones por correo
                 try {
-                    require_once 'includes/NotificacionesCitas.php';
+                    require_once 'includes/notificaciones-citas.php';
                     $notificaciones = new NotificacionesCitas();
                     $notificaciones->notificarCambioEstado($citaId, $estadoAnterior, $nuevoEstado, $motivo);
                 } catch (Exception $e) {

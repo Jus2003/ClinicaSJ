@@ -305,6 +305,28 @@ class Cita {
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    // Verificar si una cita tiene triaje completado
+    public function tieneTriajeCompletado($citaId) {
+        $sql = "SELECT COUNT(*) as total FROM triaje_respuestas 
+            WHERE id_cita = :cita_id AND tipo_triaje = 'digital'";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['cita_id' => $citaId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $result['total'] > 0;
+    }
+
+// Obtener precios por especialidad
+    public function getPrecioPorEspecialidad($especialidadId) {
+        $sql = "SELECT precio_consulta FROM especialidades WHERE id_especialidad = :id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['id' => $especialidadId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $result ? $result['precio_consulta'] : 35.00; // Precio por defecto
+    }
 }
 
 ?>

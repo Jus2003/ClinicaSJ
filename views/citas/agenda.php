@@ -11,35 +11,87 @@ $citaModel = new Cita();
 $error = '';
 $success = '';
 
-// Filtros
-$fechaInicio = $_GET['fecha_inicio'] ?? date('Y-m-d');
-$fechaFin = $_GET['fecha_fin'] ?? date('Y-m-d', strtotime('+7 days'));
+// Filtros básicos
+$fechaInicio = $_GET['fecha_inicio'] ?? date('Y-m-d', strtotime('-7 days'));
+$fechaFin = $_GET['fecha_fin'] ?? date('Y-m-d', strtotime('+200 days'));
 $estado_filter = $_GET['estado'] ?? 'todas';
 
-// Procesar acciones (cambiar estado de citas)
+// Procesar acciones
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+    $citaId = $_POST['cita_id'] ?? 0;
+
     try {
-        $action = $_POST['action'] ?? '';
+        require_once 'config/database.php';
+        $database = new Database();
+        $db = $database->getConnection();
 
         switch ($action) {
             case 'confirmar_cita':
-                $citaId = $_POST['cita_id'];
+                // Obtener estado anterior
+                $sqlEstado = "SELECT estado_cita FROM citas WHERE id_cita = :cita_id";
+                $stmtEstado = $db->prepare($sqlEstado);
+                $stmtEstado->execute(['cita_id' => $citaId]);
+                $estadoAnterior = $stmtEstado->fetchColumn();
+
                 $citaModel->updateEstadoCita($citaId, 'confirmada');
+
+                // Enviar notificaciones
+                try {
+                    require_once 'includes/notificaciones-citas.php';
+                    $notificador = new NotificacionesCitas($db);
+                    $notificador->notificarCambioEstado($citaId, $estadoAnterior, 'confirmada');
+                } catch (Exception $e) {
+                    error_log("Error enviando notificaciones: " . $e->getMessage());
+                }
+
                 $success = "Cita confirmada exitosamente";
                 break;
 
             case 'cancelar_cita':
-                $citaId = $_POST['cita_id'];
                 $motivo = $_POST['motivo_cancelacion'] ?? 'Cancelada por el usuario';
+
+                // Obtener estado anterior
+                $sqlEstado = "SELECT estado_cita FROM citas WHERE id_cita = :cita_id";
+                $stmtEstado = $db->prepare($sqlEstado);
+                $stmtEstado->execute(['cita_id' => $citaId]);
+                $estadoAnterior = $stmtEstado->fetchColumn();
+
                 $citaModel->updateEstadoCita($citaId, 'cancelada', $motivo);
+
+                // Enviar notificaciones
+                try {
+                    require_once 'includes/notificaciones-citas.php';
+                    $notificador = new NotificacionesCitas($db);
+                    $notificador->notificarCambioEstado($citaId, $estadoAnterior, 'cancelada', $motivo);
+                } catch (Exception $e) {
+                    error_log("Error enviando notificaciones: " . $e->getMessage());
+                }
+
                 $success = "Cita cancelada exitosamente";
                 break;
 
             case 'completar_cita':
-                $citaId = $_POST['cita_id'];
                 $observaciones = $_POST['observaciones'] ?? '';
+
+                // Obtener estado anterior
+                $sqlEstado = "SELECT estado_cita FROM citas WHERE id_cita = :cita_id";
+                $stmtEstado = $db->prepare($sqlEstado);
+                $stmtEstado->execute(['cita_id' => $citaId]);
+                $estadoAnterior = $stmtEstado->fetchColumn();
+
                 $citaModel->updateEstadoCita($citaId, 'completada', $observaciones);
-                $success = "Cita marcada como completada";
+
+                // Enviar notificaciones
+                try {
+                    require_once 'includes/notificaciones-citas.php';
+                    $notificador = new NotificacionesCitas($db);
+                    $notificador->notificarCambioEstado($citaId, $estadoAnterior, 'completada');
+                } catch (Exception $e) {
+                    error_log("Error enviando notificaciones: " . $e->getMessage());
+                }
+
+                $success = "Cita completada exitosamente";
                 break;
         }
     } catch (Exception $e) {
@@ -47,358 +99,385 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Obtener citas según el rol
+// Obtener citas según rol - CONSULTA DIRECTA SIN USAR MÉTODOS COMPLEJOS
+require_once 'config/database.php';
+$database = new Database();
+$db = $database->getConnection();
+
 $citas = [];
+$tituloAgenda = "Agenda";
+$vistaRol = "general";
+
+// Construir consulta base según rol
+$whereConditions = [];
+$params = [];
+
+// Filtros de fecha
+$whereConditions[] = "c.fecha_cita BETWEEN :fecha_inicio AND :fecha_fin";
+$params['fecha_inicio'] = $fechaInicio;
+$params['fecha_fin'] = $fechaFin;
+
+// Filtro de estado
+if ($estado_filter !== 'todas') {
+    $whereConditions[] = "c.estado_cita = :estado";
+    $params['estado'] = $estado_filter;
+}
+
 switch ($_SESSION['role_id']) {
     case 3: // Médico
-        $citas = $citaModel->getCitasMedicoConFiltros($_SESSION['user_id'], $fechaInicio, $fechaFin, $estado_filter);
-        $tituloAgenda = "Mi Agenda Médica";
+        $whereConditions[] = "c.id_medico = :user_id";
+        $params['user_id'] = $_SESSION['user_id'];
+        $tituloAgenda = "Mi Agenda";
         $vistaRol = "medico";
         break;
 
     case 4: // Paciente
-        $citas = $citaModel->getCitasPacienteConFiltros($_SESSION['user_id'], $fechaInicio, $fechaFin, $estado_filter);
-        $tituloAgenda = "Mis Citas Médicas";
+        $whereConditions[] = "c.id_paciente = :user_id";
+        $params['user_id'] = $_SESSION['user_id'];
+        $tituloAgenda = "Mis Citas";
         $vistaRol = "paciente";
         break;
 
-    case 1: // Administrador
-    case 2: // Recepcionista
-        $citas = $citaModel->getCitasGlobalesConFiltros($fechaInicio, $fechaFin, $estado_filter, $_SESSION['user_id']);
+    default: // Admin/Recepcionista
         $tituloAgenda = "Agenda General";
         $vistaRol = "admin";
         break;
-
-    default:
-        header('Location: index.php?action=dashboard');
-        exit;
 }
 
-// Estadísticas rápidas
-$estadisticas = [
-    'total' => count($citas),
-    'agendadas' => count(array_filter($citas, fn($c) => $c['estado_cita'] === 'agendada')),
-    'confirmadas' => count(array_filter($citas, fn($c) => $c['estado_cita'] === 'confirmada')),
-    'completadas' => count(array_filter($citas, fn($c) => $c['estado_cita'] === 'completada')),
-    'canceladas' => count(array_filter($citas, fn($c) => $c['estado_cita'] === 'cancelada'))
-];
+$whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
+
+// Consulta SQL simplificada para evitar duplicados
+$sql = "SELECT DISTINCT 
+            c.id_cita,
+            c.fecha_cita,
+            c.hora_cita,
+            c.estado_cita,
+            c.tipo_cita,
+            c.motivo_consulta,
+            c.observaciones,
+            CONCAT(p.nombre, ' ', p.apellido) as paciente_nombre,
+            p.cedula as paciente_cedula,
+            p.telefono as paciente_telefono,
+            CONCAT(m.nombre, ' ', m.apellido) as medico_nombre,
+            e.nombre_especialidad,
+            s.nombre_sucursal
+        FROM citas c
+        JOIN usuarios p ON c.id_paciente = p.id_usuario
+        JOIN usuarios m ON c.id_medico = m.id_usuario
+        JOIN especialidades e ON c.id_especialidad = e.id_especialidad
+        JOIN sucursales s ON c.id_sucursal = s.id_sucursal
+        {$whereClause}
+        ORDER BY c.fecha_cita ASC, c.hora_cita ASC";
+
+$stmt = $db->prepare($sql);
+$stmt->execute($params);
+$citas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Agregar información de triaje y pagos SOLO si hay citas
+if (!empty($citas) && ($vistaRol === 'paciente' || $vistaRol === 'medico')) {
+    foreach ($citas as &$cita) {
+        // Verificar triaje completado
+        $sqlTriaje = "SELECT COUNT(*) as total FROM triaje_respuestas 
+                      WHERE id_cita = :cita_id AND tipo_triaje = 'digital'";
+        $stmtTriaje = $db->prepare($sqlTriaje);
+        $stmtTriaje->execute(['cita_id' => $cita['id_cita']]);
+        $triaje = $stmtTriaje->fetch(PDO::FETCH_ASSOC);
+        $cita['triaje_completado'] = $triaje['total'] > 0;
+
+        // Verificar estado de pago
+        $sqlPago = "SELECT estado_pago FROM pagos WHERE id_cita = :cita_id LIMIT 1";
+        $stmtPago = $db->prepare($sqlPago);
+        $stmtPago->execute(['cita_id' => $cita['id_cita']]);
+        $pago = $stmtPago->fetch(PDO::FETCH_ASSOC);
+        $cita['estado_pago'] = $pago ? $pago['estado_pago'] : 'pendiente';
+    }
+}
 
 include 'views/includes/header.php';
 include 'views/includes/navbar.php';
 ?>
 
-<div class="container-fluid mt-4">
-    <div class="row">
-        <div class="col-12">
-            <!-- Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h2 class="text-primary">
-                        <i class="fas fa-calendar"></i> <?php echo $tituloAgenda; ?>
-                    </h2>
-                    <p class="text-muted mb-0">
-                        <?php if ($vistaRol === 'medico'): ?>
-                            Gestione sus citas médicas y consultas programadas
-                        <?php elseif ($vistaRol === 'paciente'): ?>
-                            Revise sus citas médicas programadas
-                        <?php else: ?>
-                            Vista general de todas las citas del sistema
-                        <?php endif; ?>
-                    </p>
-                </div>
-                <div>
-                    <?php if ($vistaRol !== 'paciente'): ?>
-                        <a href="index.php?action=citas/agendar" class="btn btn-primary">
-                            <i class="fas fa-calendar-plus"></i> Nueva Cita
-                        </a>
-                    <?php endif; ?>
-                </div>
-            </div>
+<div class="container mt-3">
+    <h2><i class="fas fa-calendar"></i> <?= $tituloAgenda ?></h2>
 
-            <!-- Mensajes -->
-            <?php if ($error): ?>
-                <div class="alert alert-danger alert-dismissible fade show">
-                    <i class="fas fa-exclamation-triangle"></i> <?php echo $error; ?>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            <?php endif; ?>
+    <?php if ($error): ?>
+        <div class="alert alert-danger alert-dismissible fade show">
+            <i class="fas fa-exclamation-triangle"></i> <?= $error ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
 
-            <?php if ($success): ?>
-                <div class="alert alert-success alert-dismissible fade show">
-                    <i class="fas fa-check-circle"></i> <?php echo $success; ?>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            <?php endif; ?>
+    <?php if ($success): ?>
+        <div class="alert alert-success alert-dismissible fade show">
+            <i class="fas fa-check-circle"></i> <?= $success ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
 
-            <!-- Estadísticas -->
-            <div class="row mb-4">
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body text-center">
-                            <i class="fas fa-calendar-day text-primary" style="font-size: 2rem;"></i>
-                            <h4 class="mt-2 mb-0"><?php echo $estadisticas['total']; ?></h4>
-                            <small class="text-muted">Total Citas</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body text-center">
-                            <i class="fas fa-clock text-warning" style="font-size: 2rem;"></i>
-                            <h4 class="mt-2 mb-0"><?php echo $estadisticas['agendadas']; ?></h4>
-                            <small class="text-muted">Agendadas</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body text-center">
-                            <i class="fas fa-check-circle text-success" style="font-size: 2rem;"></i>
-                            <h4 class="mt-2 mb-0"><?php echo $estadisticas['confirmadas']; ?></h4>
-                            <small class="text-muted">Confirmadas</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body text-center">
-                            <i class="fas fa-star text-info" style="font-size: 2rem;"></i>
-                            <h4 class="mt-2 mb-0"><?php echo $estadisticas['completadas']; ?></h4>
-                            <small class="text-muted">Completadas</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!-- Filtros simplificados -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="GET" class="row">
+                <input type="hidden" name="action" value="citas/agenda">
 
-            <!-- Filtros -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-body">
-                    <form method="GET" class="row g-3 align-items-end">
-                        <input type="hidden" name="action" value="citas/agenda">
-
-                        <div class="col-md-3">
-                            <label class="form-label">Fecha Inicio</label>
-                            <input type="date" class="form-control" name="fecha_inicio" 
-                                   value="<?php echo $fechaInicio; ?>">
-                        </div>
-
-                        <div class="col-md-3">
-                            <label class="form-label">Fecha Fin</label>
-                            <input type="date" class="form-control" name="fecha_fin" 
-                                   value="<?php echo $fechaFin; ?>">
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Estado</label>
-                            <select class="form-select" name="estado">
-                                <option value="todas" <?php echo ($estado_filter === 'todas') ? 'selected' : ''; ?>>Todas</option>
-                                <option value="agendada" <?php echo ($estado_filter === 'agendada') ? 'selected' : ''; ?>>Agendadas</option>
-                                <option value="confirmada" <?php echo ($estado_filter === 'confirmada') ? 'selected' : ''; ?>>Confirmadas</option>
-                                <option value="en_curso" <?php echo ($estado_filter === 'en_curso') ? 'selected' : ''; ?>>En Curso</option>
-                                <option value="completada" <?php echo ($estado_filter === 'completada') ? 'selected' : ''; ?>>Completadas</option>
-                                <option value="cancelada" <?php echo ($estado_filter === 'cancelada') ? 'selected' : ''; ?>>Canceladas</option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-filter"></i> Filtrar
-                            </button>
-                        </div>
-                    </form>
+                <div class="col-md-4 mb-2">
+                    <label>Fecha Inicio</label>
+                    <input type="date" class="form-control" name="fecha_inicio" value="<?= $fechaInicio ?>">
                 </div>
-            </div>
 
-            <!-- Lista de Citas -->
-            <div class="card border-0 shadow">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0">
-                        <i class="fas fa-list"></i> 
-                        Citas del <?php echo date('d/m/Y', strtotime($fechaInicio)); ?> al <?php echo date('d/m/Y', strtotime($fechaFin)); ?>
-                    </h6>
+                <div class="col-md-4 mb-2">
+                    <label>Fecha Fin</label>
+                    <input type="date" class="form-control" name="fecha_fin" value="<?= $fechaFin ?>">
                 </div>
-                <div class="card-body p-0">
-                    <?php if (empty($citas)): ?>
-                        <div class="text-center py-5">
-                            <i class="fas fa-calendar-times text-muted" style="font-size: 3rem;"></i>
-                            <h5 class="mt-3 text-muted">No hay citas programadas</h5>
-                            <p class="text-muted">
-                                <?php if ($vistaRol === 'paciente'): ?>
-                                    No tiene citas programadas en el rango seleccionado.
+
+                <div class="col-md-4 mb-2">
+                    <label>Estado</label>
+                    <select class="form-select" name="estado">
+                        <option value="todas" <?= ($estado_filter === 'todas') ? 'selected' : '' ?>>Todas</option>
+                        <option value="agendada" <?= ($estado_filter === 'agendada') ? 'selected' : '' ?>>Agendadas</option>
+                        <option value="confirmada" <?= ($estado_filter === 'confirmada') ? 'selected' : '' ?>>Confirmadas</option>
+                        <option value="completada" <?= ($estado_filter === 'completada') ? 'selected' : '' ?>>Completadas</option>
+                        <option value="cancelada" <?= ($estado_filter === 'cancelada') ? 'selected' : '' ?>>Canceladas</option>
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter"></i> Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de citas -->
+    <div class="card">
+        <div class="card-header">
+            <h6 class="mb-0">
+                <i class="fas fa-list"></i> 
+                Citas encontradas: <?= count($citas) ?>
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            <?php if (empty($citas)): ?>
+                <div class="text-center p-4">
+                    <i class="fas fa-calendar-times fa-2x text-muted mb-3"></i>
+                    <h5>No hay citas programadas</h5>
+                    <p class="text-muted">No se encontraron citas en el rango de fechas seleccionado.</p>
+                </div>
+            <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Fecha/Hora</th>
+                                <?php if ($vistaRol === 'medico'): ?>
+                                    <th>Paciente</th>
+                                <?php elseif ($vistaRol === 'paciente'): ?>
+                                    <th>Médico</th>
+                                    <th>Especialidad</th>
                                 <?php else: ?>
-                                    No hay citas programadas en el rango seleccionado.
+                                    <th>Paciente</th>
+                                    <th>Médico</th>
                                 <?php endif; ?>
-                            </p>
-                            <?php if ($vistaRol !== 'paciente'): ?>
-                                <a href="index.php?action=citas/agendar" class="btn btn-primary">
-                                    <i class="fas fa-calendar-plus"></i> Agendar Nueva Cita
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Fecha/Hora</th>
-                                        <?php if ($vistaRol === 'medico'): ?>
-                                            <th>Paciente</th>
-                                            <th>Contacto</th>
-                                        <?php elseif ($vistaRol === 'paciente'): ?>
-                                            <th>Médico</th>
-                                            <th>Especialidad</th>
-                                        <?php else: ?>
-                                            <th>Paciente</th>
-                                            <th>Médico</th>
-                                            <th>Especialidad</th>
-                                        <?php endif; ?>
-                                        <th>Sucursal</th>
-                                        <th>Tipo</th>
-                                        <th>Estado</th>
-                                        <th>Motivo</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($citas as $cita): ?>
-                                        <tr>
-                                            <td>
-                                                <div>
-                                                    <strong><?php echo date('d/m/Y', strtotime($cita['fecha_cita'])); ?></strong>
-                                                    <br>
-                                                    <span class="text-muted"><?php echo date('H:i', strtotime($cita['hora_cita'])); ?></span>
-                                                </div>
-                                            </td>
+                                <th>Estado</th>
+                                <?php if ($vistaRol === 'paciente' || $vistaRol === 'medico'): ?>
+                                    <th>Triaje</th>
+                                    <th>Pago</th>
+                                <?php endif; ?>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($citas as $cita): ?>
+                                <tr>
+                                    <td>
+                                        <strong><?= date('d/m/Y', strtotime($cita['fecha_cita'])) ?></strong>
+                                        <br>
+                                        <small class="text-muted"><?= date('H:i', strtotime($cita['hora_cita'])) ?></small>
+                                    </td>
 
-                                            <?php if ($vistaRol === 'medico'): ?>
-                                                <td>
-                                                    <div>
-                                                        <strong><?php echo $cita['paciente_nombre']; ?></strong>
-                                                        <br>
-                                                        <small class="text-muted">CI: <?php echo $cita['paciente_cedula'] ?? 'N/A'; ?></small>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <?php if (!empty($cita['paciente_telefono'])): ?>
-                                                        <a href="tel:<?php echo $cita['paciente_telefono']; ?>" class="text-decoration-none">
-                                                            <i class="fas fa-phone text-primary"></i> <?php echo $cita['paciente_telefono']; ?>
-                                                        </a>
+                                    <?php if ($vistaRol === 'medico'): ?>
+                                        <td>
+                                            <strong><?= htmlspecialchars($cita['paciente_nombre']) ?></strong>
+                                            <?php if (!empty($cita['paciente_cedula'])): ?>
+                                                <br><small class="text-muted">CI: <?= htmlspecialchars($cita['paciente_cedula']) ?></small>
+                                            <?php endif; ?>
+                                        </td>
+                                    <?php elseif ($vistaRol === 'paciente'): ?>
+                                        <td>
+                                            <strong>Dr. <?= htmlspecialchars($cita['medico_nombre']) ?></strong>
+                                        </td>
+                                        <td>
+                                            <?= htmlspecialchars($cita['nombre_especialidad']) ?>
+                                        </td>
+                                    <?php else: ?>
+                                        <td><?= htmlspecialchars($cita['paciente_nombre']) ?></td>
+                                        <td>Dr. <?= htmlspecialchars($cita['medico_nombre']) ?></td>
+                                    <?php endif; ?>
+
+                                    <td>
+                                        <?php
+                                        $badgeColor = match ($cita['estado_cita']) {
+                                            'agendada' => 'bg-warning',
+                                            'confirmada' => 'bg-success',
+                                            'completada' => 'bg-primary',
+                                            'cancelada' => 'bg-danger',
+                                            default => 'bg-secondary'
+                                        };
+                                        ?>
+                                        <span class="badge <?= $badgeColor ?>">
+                                            <?= ucfirst($cita['estado_cita']) ?>
+                                        </span>
+                                    </td>
+
+                                    <?php if ($vistaRol === 'paciente' || $vistaRol === 'medico'): ?>
+                                        <!-- Columna Triaje -->
+                                        <td>
+                                            <?php if ($vistaRol === 'paciente'): ?>
+                                                <?php if ($cita['estado_cita'] === 'confirmada'): ?>
+                                                    <?php if ($cita['triaje_completado']): ?>
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-check"></i> Hecho
+                                                        </span>
                                                     <?php else: ?>
-                                                        <span class="text-muted">Sin teléfono</span>
+                                                        <span class="badge bg-warning">
+                                                            <i class="fas fa-clock"></i> Pendiente
+                                                        </span>
                                                     <?php endif; ?>
-                                                </td>
-                                            <?php elseif ($vistaRol === 'paciente'): ?>
-                                                <td>
-                                                    <strong>Dr. <?php echo $cita['medico_nombre']; ?></strong>
-                                                </td>
-                                                <td><?php echo $cita['nombre_especialidad']; ?></td>
-                                            <?php else: ?>
-                                                <td><?php echo $cita['paciente_nombre']; ?></td>
-                                                <td>Dr. <?php echo $cita['medico_nombre']; ?></td>
-                                                <td><?php echo $cita['nombre_especialidad']; ?></td>
+                                                <?php else: ?>
+                                                    <span class="text-muted">-</span>
+                                                <?php endif; ?>
+                                            <?php elseif ($vistaRol === 'medico'): ?>
+                                                <?php if ($cita['triaje_completado']): ?>
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-check"></i> Disponible
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-light text-dark">
+                                                        <i class="fas fa-minus"></i> Sin triaje
+                                                    </span>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
+                                        </td>
+
+                                        <!-- Columna Pago -->
+                                        <td>
+                                            <?php
+                                            $pagoClass = match ($cita['estado_pago']) {
+                                                'pagado' => 'bg-success',
+                                                'pendiente' => 'bg-danger',
+                                                default => 'bg-danger'
+                                            };
+                                            ?>
+                                            <span class="badge <?= $pagoClass ?>">
+                                                <i class="fas fa-<?= $cita['estado_pago'] === 'pagado' ? 'check' : 'dollar-sign' ?>"></i>
+                                                <?= ucfirst($cita['estado_pago']) ?>
+                                            </span>
+                                        </td>
+                                    <?php endif; ?>
+
+                                    <!-- Columna Acciones -->
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+
+                                            <?php if ($vistaRol === 'paciente'): ?>
+                                                <!-- Botones para Pacientes -->
+
+                                                <!-- Triaje Digital -->
+                                                <?php if ($cita['estado_cita'] === 'confirmada' && !$cita['triaje_completado']): ?>
+                                                    <a href="index.php?action=consultas/triaje/completar&cita_id=<?= $cita['id_cita'] ?>" 
+                                                       class="btn btn-success btn-sm" title="Completar Triaje">
+                                                        <i class="fas fa-clipboard-list"></i>
+                                                    </a>
+                                                <?php endif; ?>
+
+                                                <!-- Pago -->
+                                                <?php if ($cita['estado_pago'] === 'pendiente' && in_array($cita['estado_cita'], ['confirmada', 'completada'])): ?>
+                                                    <a href="index.php?action=citas/pagar&cita_id=<?= $cita['id_cita'] ?>" 
+                                                       class="btn btn-warning btn-sm" title="Pagar">
+                                                        <i class="fas fa-credit-card"></i>
+                                                    </a>
+                                                <?php endif; ?>
+
+                                            <?php elseif ($vistaRol === 'medico'): ?>
+                                                <!-- Botones para Médicos -->
+
+                                                <!-- Ver Triaje -->
+                                                <?php if ($cita['triaje_completado']): ?>
+                                                    <a href="index.php?action=consultas/triaje/ver&cita_id=<?= $cita['id_cita'] ?>" 
+                                                       class="btn btn-info btn-sm" title="Ver Triaje">
+                                                        <i class="fas fa-clipboard-list"></i>
+                                                    </a>
+                                                <?php endif; ?>
+
+                                                <!-- Atender Paciente -->
+                                                <?php if ($cita['estado_cita'] === 'confirmada'): ?>
+                                                    <a href="index.php?action=consultas/atender&cita_id=<?= $cita['id_cita'] ?>" 
+                                                       class="btn btn-success btn-sm" title="Atender">
+                                                        <i class="fas fa-user-md"></i>
+                                                    </a>
+                                                <?php endif; ?>
+
+                                                <!-- Completar Cita -->
+                                                <?php if ($cita['estado_cita'] === 'confirmada'): ?>
+                                                    <button class="btn btn-primary btn-sm" 
+                                                            onclick="completarCita(<?= $cita['id_cita'] ?>)" title="Completar">
+                                                        <i class="fas fa-check-double"></i>
+                                                    </button>
+                                                <?php endif; ?>
+
                                             <?php endif; ?>
 
-                                            <td><?php echo $cita['nombre_sucursal']; ?></td>
-                                            <td>
-                                                <span class="badge bg-<?php echo $cita['tipo_cita'] === 'virtual' ? 'info' : 'primary'; ?>">
-                                                    <i class="fas fa-<?php echo $cita['tipo_cita'] === 'virtual' ? 'video' : 'hospital'; ?>"></i>
-                                                    <?php echo ucfirst($cita['tipo_cita']); ?>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <?php
-                                                $badgeColors = [
-                                                    'agendada' => 'warning',
-                                                    'confirmada' => 'success',
-                                                    'en_curso' => 'info',
-                                                    'completada' => 'primary',
-                                                    'cancelada' => 'danger',
-                                                    'no_asistio' => 'secondary'
-                                                ];
-                                                $badgeColor = $badgeColors[$cita['estado_cita']] ?? 'secondary';
-                                                ?>
-                                                <span class="badge bg-<?php echo $badgeColor; ?>">
-                                                    <?php echo ucfirst(str_replace('_', ' ', $cita['estado_cita'])); ?>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <small class="text-muted">
-                                                    <?php
-                                                    echo strlen($cita['motivo_consulta']) > 50 ? substr($cita['motivo_consulta'], 0, 50) . '...' : $cita['motivo_consulta'];
-                                                    ?>
-                                                </small>
-                                            </td>
-                                            <td>
-                                                <div class="btn-group btn-group-sm">
-                                                    <!-- Botón Ver Detalles -->
-                                                    <button class="btn btn-outline-info" 
-                                                            onclick="verDetallesCita(<?php echo $cita['id_cita']; ?>, '<?php echo addslashes(json_encode($cita)); ?>')"
-                                                            title="Ver Detalles">
-                                                        <i class="fas fa-eye"></i>
+                                            <!-- Botón Ver Detalles (para todos) -->
+                                            <button class="btn btn-outline-info btn-sm" 
+                                                    onclick="verDetallesCita(<?= $cita['id_cita'] ?>, '<?= addslashes(json_encode($cita)) ?>')" 
+                                                    title="Ver Detalles">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+
+                                            <!-- Confirmar cita (solo para agendadas y no pacientes) -->
+                                            <?php if ($cita['estado_cita'] === 'agendada' && $vistaRol !== 'paciente'): ?>
+                                                <form method="POST" class="d-inline">
+                                                    <input type="hidden" name="action" value="confirmar_cita">
+                                                    <input type="hidden" name="cita_id" value="<?= $cita['id_cita'] ?>">
+                                                    <button type="submit" class="btn btn-outline-success btn-sm" title="Confirmar">
+                                                        <i class="fas fa-check"></i>
                                                     </button>
+                                                </form>
+                                            <?php endif; ?>
 
-                                                    <?php if ($vistaRol !== 'paciente'): ?>
-                                                        <!-- Acciones según estado -->
-                                                        <?php if ($cita['estado_cita'] === 'agendada'): ?>
-                                                            <form method="POST" style="display: inline;">
-                                                                <input type="hidden" name="action" value="confirmar_cita">
-                                                                <input type="hidden" name="cita_id" value="<?php echo $cita['id_cita']; ?>">
-                                                                <button type="submit" class="btn btn-outline-success" title="Confirmar">
-                                                                    <i class="fas fa-check"></i>
-                                                                </button>
-                                                            </form>
-                                                        <?php endif; ?>
-
-                                                        <?php if (in_array($cita['estado_cita'], ['agendada', 'confirmada'])): ?>
-                                                            <button class="btn btn-outline-danger" 
-                                                                    onclick="cancelarCita(<?php echo $cita['id_cita']; ?>, '<?php echo addslashes($cita['paciente_nombre'] ?? $cita['medico_nombre']); ?>')"
-                                                                    title="Cancelar">
-                                                                <i class="fas fa-times"></i>
-                                                            </button>
-                                                        <?php endif; ?>
-
-                                                        <?php if ($cita['estado_cita'] === 'confirmada' && $vistaRol === 'medico'): ?>
-                                                            <button class="btn btn-outline-primary" 
-                                                                    onclick="completarCita(<?php echo $cita['id_cita']; ?>)"
-                                                                    title="Marcar como Completada">
-                                                                <i class="fas fa-check-double"></i>
-                                                            </button>
-                                                        <?php endif; ?>
-                                                    <?php endif; ?>
-
-                                                    <!-- Triaje si es médico o recepcionista -->
-                                                    <?php if (in_array($vistaRol, ['medico', 'admin']) && $cita['estado_cita'] === 'confirmada'): ?>
-                                                        <a href="index.php?action=consultas/triaje/ver&cita_id=<?php echo $cita['id_cita']; ?>" 
-                                                           class="btn btn-outline-secondary" title="Ver Triaje">
-                                                            <i class="fas fa-clipboard-list"></i>
-                                                        </a>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endif; ?>
+                                            <!-- Cancelar cita -->
+                                            <?php if (in_array($cita['estado_cita'], ['agendada', 'confirmada'])): ?>
+                                                <button class="btn btn-outline-danger btn-sm" 
+                                                        onclick="cancelarCita(<?= $cita['id_cita'] ?>)" title="Cancelar">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
-            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
 
-<!-- Modal Detalles de Cita -->
-<div class="modal fade" id="modalDetallesCita" tabindex="-1">
+<!-- Modal Detalles -->
+<div class="modal fade" id="modalDetalles">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-calendar-alt"></i> Detalles de la Cita
+                    <i class="fas fa-calendar-alt"></i> Detalles de Cita
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="detallesCitaContent">
-                <!-- Contenido se carga dinámicamente -->
+            <div class="modal-body" id="detallesContent">
+                <!-- Contenido dinámico -->
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -407,8 +486,8 @@ include 'views/includes/navbar.php';
     </div>
 </div>
 
-<!-- Modal Cancelar Cita -->
-<div class="modal fade" id="modalCancelarCita" tabindex="-1">
+<!-- Modal Cancelar -->
+<div class="modal fade" id="modalCancelar">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -419,21 +498,20 @@ include 'views/includes/navbar.php';
             </div>
             <form method="POST">
                 <input type="hidden" name="action" value="cancelar_cita">
-                <input type="hidden" name="cita_id" id="cancelarCitaId">
+                <input type="hidden" name="cita_id" id="citaCancelarId">
 
                 <div class="modal-body">
-                    <p>¿Está seguro que desea cancelar la cita de <strong id="cancelarCitaNombre"></strong>?</p>
-
+                    <p>¿Está seguro que desea cancelar esta cita?</p>
                     <div class="mb-3">
                         <label class="form-label">Motivo de cancelación</label>
-                        <textarea class="form-control" name="motivo_cancelacion" rows="3" 
+                        <textarea name="motivo_cancelacion" class="form-control" rows="3" required 
                                   placeholder="Ingrese el motivo de la cancelación..."></textarea>
                     </div>
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No, mantener cita</button>
-                    <button type="submit" class="btn btn-danger">Sí, cancelar cita</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="submit" class="btn btn-danger">Confirmar Cancelación</button>
                 </div>
             </form>
         </div>
@@ -441,7 +519,7 @@ include 'views/includes/navbar.php';
 </div>
 
 <!-- Modal Completar Cita -->
-<div class="modal fade" id="modalCompletarCita" tabindex="-1">
+<div class="modal fade" id="modalCompletar">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -452,14 +530,13 @@ include 'views/includes/navbar.php';
             </div>
             <form method="POST">
                 <input type="hidden" name="action" value="completar_cita">
-                <input type="hidden" name="cita_id" id="completarCitaId">
+                <input type="hidden" name="cita_id" id="citaCompletarId">
 
                 <div class="modal-body">
                     <p>Marcar la cita como completada.</p>
-
                     <div class="mb-3">
                         <label class="form-label">Observaciones finales (opcional)</label>
-                        <textarea class="form-control" name="observaciones" rows="3" 
+                        <textarea name="observaciones" class="form-control" rows="3" 
                                   placeholder="Ingrese observaciones sobre la consulta..."></textarea>
                     </div>
                 </div>
@@ -473,37 +550,139 @@ include 'views/includes/navbar.php';
     </div>
 </div>
 
-<style>
-    .avatar-md {
-        width: 48px;
-        height: 48px;
-        font-size: 1.2rem;
+<script>
+// Función para ver detalles
+    function verDetallesCita(citaId, citaData) {
+        const cita = JSON.parse(citaData);
+
+        const content = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6 class="text-primary mb-3">
+                    <i class="fas fa-calendar-alt"></i> Información de la Cita
+                </h6>
+                <table class="table table-sm">
+                    <tr><td><strong>ID:</strong></td><td>${cita.id_cita}</td></tr>
+                    <tr><td><strong>Fecha:</strong></td><td>${new Date(cita.fecha_cita).toLocaleDateString('es-ES')}</td></tr>
+                    <tr><td><strong>Hora:</strong></td><td>${cita.hora_cita}</td></tr>
+                    <tr><td><strong>Estado:</strong></td><td><span class="badge bg-info">${cita.estado_cita}</span></td></tr>
+                    ${cita.tipo_cita ? `<tr><td><strong>Tipo:</strong></td><td>${cita.tipo_cita}</td></tr>` : ''}
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-primary mb-3">
+                    <i class="fas fa-users"></i> Participantes
+                </h6>
+                <table class="table table-sm">
+                    ${cita.paciente_nombre ? `<tr><td><strong>Paciente:</strong></td><td>${cita.paciente_nombre}</td></tr>` : ''}
+                    ${cita.medico_nombre ? `<tr><td><strong>Médico:</strong></td><td>Dr. ${cita.medico_nombre}</td></tr>` : ''}
+                    ${cita.nombre_especialidad ? `<tr><td><strong>Especialidad:</strong></td><td>${cita.nombre_especialidad}</td></tr>` : ''}
+                    ${cita.nombre_sucursal ? `<tr><td><strong>Sucursal:</strong></td><td>${cita.nombre_sucursal}</td></tr>` : ''}
+                </table>
+            </div>
+        </div>
+        
+        ${cita.triaje_completado !== undefined ? `
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <h6 class="text-primary mb-3">
+                    <i class="fas fa-clipboard-list"></i> Triaje Digital
+                </h6>
+                <div class="alert ${cita.triaje_completado ? 'alert-success' : 'alert-warning'} mb-0">
+                    <i class="fas fa-${cita.triaje_completado ? 'check-circle' : 'clock'}"></i>
+                    ${cita.triaje_completado ? 'Completado' : 'Pendiente'}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-primary mb-3">
+                    <i class="fas fa-credit-card"></i> Estado del Pago
+                </h6>
+                <div class="alert ${cita.estado_pago === 'pagado' ? 'alert-success' : 'alert-danger'} mb-0">
+                    <i class="fas fa-${cita.estado_pago === 'pagado' ? 'check-circle' : 'dollar-sign'}"></i>
+                    ${cita.estado_pago.charAt(0).toUpperCase() + cita.estado_pago.slice(1)}
+                </div>
+            </div>
+        </div>` : ''}
+        
+        ${cita.motivo_consulta ? `
+        <div class="mt-3">
+            <h6 class="text-primary mb-3">
+                <i class="fas fa-notes-medical"></i> Motivo de Consulta
+            </h6>
+            <div class="alert alert-info mb-0">${cita.motivo_consulta}</div>
+        </div>` : ''}
+    `;
+
+        document.getElementById('detallesContent').innerHTML = content;
+        new bootstrap.Modal(document.getElementById('modalDetalles')).show();
     }
 
+// Función para cancelar cita
+    function cancelarCita(citaId) {
+        document.getElementById('citaCancelarId').value = citaId;
+        new bootstrap.Modal(document.getElementById('modalCancelar')).show();
+    }
+
+// Función para completar cita
+    function completarCita(citaId) {
+        document.getElementById('citaCompletarId').value = citaId;
+        new bootstrap.Modal(document.getElementById('modalCompletar')).show();
+    }
+
+// Prevenir doble envío de formularios
+    document.addEventListener('DOMContentLoaded', function () {
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function () {
+                const submitButton = form.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    const originalText = submitButton.innerHTML;
+                    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+
+                    // Rehabilitar después de 3 segundos por si hay error
+                    setTimeout(() => {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalText;
+                    }, 3000);
+                }
+            });
+        });
+    });
+</script>
+
+<style>
     .table td {
         vertical-align: middle;
     }
 
     .badge {
         font-size: 0.75rem;
+        padding: 0.35rem 0.65rem;
     }
 
     .btn-group-sm .btn {
-        margin-right: 2px;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        margin-right: 0.1rem;
     }
 
-    .card-body {
-        padding: 1.5rem;
+    /* Mejorar hover de botones */
+    .btn:hover {
+        transform: translateY(-1px);
+        transition: all 0.2s ease;
     }
 
+    /* Badges con iconos */
+    .badge i {
+        margin-right: 0.25rem;
+    }
+
+    /* Responsive */
     @media (max-width: 768px) {
-        .table-responsive {
-            font-size: 0.875rem;
-        }
-
         .btn-group-sm .btn {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
+            padding: 0.2rem 0.4rem;
+            font-size: 0.7rem;
         }
 
         .badge {
@@ -511,140 +690,15 @@ include 'views/includes/navbar.php';
         }
     }
 
-    /* Estados de citas */
-    .estado-agendada {
-        color: #f57c00;
-    }
-    .estado-confirmada {
-        color: #2e7d32;
-    }
-    .estado-en-curso {
-        color: #1976d2;
-    }
-    .estado-completada {
-        color: #5e35b1;
-    }
-    .estado-cancelada {
-        color: #d32f2f;
-    }
-    .estado-no-asistio {
-        color: #616161;
-    }
-
-    /* Hover effects */
+    /* Animaciones suaves */
     .table-hover tbody tr:hover {
         background-color: rgba(0,123,255,0.075);
+        transition: background-color 0.2s ease;
     }
 
-    .btn-outline-info:hover,
-    .btn-outline-success:hover,
-    .btn-outline-danger:hover,
-    .btn-outline-primary:hover,
-    .btn-outline-secondary:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    /* Mejorar contraste de badges */
+    .badge.bg-light {
+        color: #495057 !important;
+        border: 1px solid #dee2e6;
     }
 </style>
-
-<script>
-// Función para ver detalles de la cita
-    function verDetallesCita(citaId, citaData) {
-        const cita = JSON.parse(citaData);
-
-        const content = `
-        <div class="row">
-            <div class="col-md-6">
-                <h6 class="text-primary">Información de la Cita</h6>
-                <table class="table table-sm">
-                    <tr>
-                        <td><strong>ID Cita:</strong></td>
-                        <td>${cita.id_cita}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Fecha:</strong></td>
-                        <td>${new Date(cita.fecha_cita).toLocaleDateString('es-ES')}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Hora:</strong></td>
-                        <td>${cita.hora_cita}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Tipo:</strong></td>
-                        <td>${cita.tipo_cita}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Estado:</strong></td>
-                        <td><span class="badge bg-info">${cita.estado_cita}</span></td>
-                    </tr>
-                </table>
-            </div>
-            <div class="col-md-6">
-                <h6 class="text-primary">Participantes</h6>
-                <table class="table table-sm">
-                    ${cita.paciente_nombre ? `
-                    <tr>
-                        <td><strong>Paciente:</strong></td>
-                        <td>${cita.paciente_nombre}</td>
-                    </tr>
-                    ${cita.paciente_cedula ? `
-                    <tr>
-                        <td><strong>Cédula:</strong></td>
-                        <td>${cita.paciente_cedula}</td>
-                    </tr>` : ''}
-                    ${cita.paciente_telefono ? `
-                    <tr>
-                        <td><strong>Teléfono:</strong></td>
-                        <td>${cita.paciente_telefono}</td>
-                    </tr>` : ''}
-                    ` : ''}
-                    ${cita.medico_nombre ? `
-                    <tr>
-                        <td><strong>Médico:</strong></td>
-                        <td>Dr. ${cita.medico_nombre}</td>
-                    </tr>` : ''}
-                    <tr>
-                        <td><strong>Especialidad:</strong></td>
-                        <td>${cita.nombre_especialidad}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Sucursal:</strong></td>
-                        <td>${cita.nombre_sucursal}</td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-        ${cita.motivo_consulta ? `
-        <div class="mt-3">
-            <h6 class="text-primary">Motivo de Consulta</h6>
-            <p class="text-muted">${cita.motivo_consulta}</p>
-        </div>` : ''}
-        ${cita.observaciones ? `
-        <div class="mt-3">
-            <h6 class="text-primary">Observaciones</h6>
-            <p class="text-muted">${cita.observaciones}</p>
-        </div>` : ''}
-    `;
-
-        document.getElementById('detallesCitaContent').innerHTML = content;
-
-        const modal = new bootstrap.Modal(document.getElementById('modalDetallesCita'));
-        modal.show();
-    }
-
-// Función para cancelar cita
-    function cancelarCita(citaId, nombrePaciente) {
-        document.getElementById('cancelarCitaId').value = citaId;
-        document.getElementById('cancelarCitaNombre').textContent = nombrePaciente;
-
-        const modal = new bootstrap.Modal(document.getElementById('modalCancelarCita'));
-        modal.show();
-    }
-
-// Función para completar cita
-    function completarCita(citaId) {
-        document.getElementById('completarCitaId').value = citaId;
-
-        const modal = new bootstrap.Modal(document.getElementById('modalCompletarCita'));
-        modal.show();
-    }
-</script>

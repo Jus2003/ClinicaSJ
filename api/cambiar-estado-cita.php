@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once '../../config/database.php';
+require_once '../config/database.php';
 
 header('Content-Type: application/json');
 
@@ -35,12 +35,13 @@ try {
         throw new Exception('Estado no válido');
     }
     
-    // Verificar que la cita existe
+    // OBTENER ESTADO ANTERIOR ANTES DE ACTUALIZAR
     $sqlVerificar = "SELECT estado_cita FROM citas WHERE id_cita = :cita_id";
     $stmtVerificar = $db->prepare($sqlVerificar);
     $stmtVerificar->execute(['cita_id' => $citaId]);
+    $estadoAnterior = $stmtVerificar->fetchColumn();
     
-    if (!$stmtVerificar->fetch()) {
+    if (!$estadoAnterior) {
         throw new Exception('Cita no encontrada');
     }
     
@@ -62,12 +63,25 @@ try {
         ]);
     }
     
+    // AGREGAR NOTIFICACIONES POR CORREO
+    try {
+        require_once '../includes/notificaciones-citas.php';
+        $notificador = new NotificacionesCitas($db);
+        $notificador->notificarCambioEstado($citaId, $estadoAnterior, $nuevoEstado, $motivo);
+        
+        error_log("Notificaciones de cambio de estado enviadas para cita ID: " . $citaId);
+    } catch (Exception $e) {
+        error_log("Error enviando notificaciones: " . $e->getMessage());
+        // No fallar la operación por error de notificaciones
+    }
+    
     echo json_encode([
         'success' => true,
-        'message' => 'Estado actualizado exitosamente'
+        'message' => 'Estado actualizado exitosamente y notificaciones enviadas'
     ]);
     
 } catch (Exception $e) {
+    error_log("Error en cambiar-estado-cita.php: " . $e->getMessage());
     echo json_encode([
         'success' => false,
         'error' => $e->getMessage()

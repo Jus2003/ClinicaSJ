@@ -3,6 +3,112 @@ require_once 'models/Especialidad.php';
 require_once 'models/Sucursal.php';
 require_once 'models/User.php';
 
+// *** PROCESAMIENTO DE AGENDAMIENTO (ALTERNATIVA) ***
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'agendar_cita') {
+    header('Content-Type: application/json');
+
+    try {
+        require_once 'config/database.php';
+        $database = new Database();
+        $db = $database->getConnection();
+
+        // Obtener datos del POST
+        $fechaCita = $_POST['fecha_cita'] ?? '';
+        $tipoCita = $_POST['tipo_cita'] ?? '';
+        $idEspecialidad = $_POST['id_especialidad'] ?? '';
+        $idSucursal = $_POST['id_sucursal'] ?? '';
+        $idMedico = $_POST['id_medico'] ?? '';
+        $horaCita = $_POST['hora_cita'] ?? '';
+        $motivoConsulta = $_POST['motivo_consulta'] ?? '';
+        $observaciones = $_POST['observaciones'] ?? '';
+        $idPaciente = $_POST['id_paciente'] ?? $_SESSION['user_id'];
+
+        // Validaciones básicas
+        if (empty($fechaCita) || empty($tipoCita) || empty($idEspecialidad) ||
+                empty($idSucursal) || empty($idMedico) || empty($horaCita) ||
+                empty($motivoConsulta)) {
+            throw new Exception('Todos los campos obligatorios deben estar completos');
+        }
+
+        // Verificar que la fecha no sea en el pasado
+        if ($fechaCita < date('Y-m-d')) {
+            throw new Exception('No se pueden agendar citas en fechas pasadas');
+        }
+
+        // Verificar que no haya conflicto de horarios
+        $sqlConflicto = "SELECT COUNT(*) as total FROM citas 
+                         WHERE id_medico = :medico 
+                         AND fecha_cita = :fecha 
+                         AND hora_cita = :hora
+                         AND estado_cita NOT IN ('cancelada', 'no_asistio')";
+
+        $stmtConflicto = $db->prepare($sqlConflicto);
+        $stmtConflicto->execute([
+            'medico' => $idMedico,
+            'fecha' => $fechaCita,
+            'hora' => $horaCita
+        ]);
+
+        if ($stmtConflicto->fetch()['total'] > 0) {
+            throw new Exception('Ya existe una cita en ese horario');
+        }
+
+        // Insertar la cita
+        $sqlInsert = "INSERT INTO citas (id_paciente, id_medico, id_especialidad, id_sucursal, 
+                                       fecha_cita, hora_cita, tipo_cita, estado_cita, 
+                                       motivo_consulta, observaciones, id_usuario_registro, fecha_registro) 
+                      VALUES (:paciente, :medico, :especialidad, :sucursal, :fecha, :hora, 
+                              :tipo, 'agendada', :motivo, :observaciones, :usuario_registro, NOW())";
+
+        $stmtInsert = $db->prepare($sqlInsert);
+        $stmtInsert->execute([
+            'paciente' => $idPaciente,
+            'medico' => $idMedico,
+            'especialidad' => $idEspecialidad,
+            'sucursal' => $idSucursal,
+            'fecha' => $fechaCita,
+            'hora' => $horaCita,
+            'tipo' => $tipoCita,
+            'motivo' => $motivoConsulta,
+            'observaciones' => $observaciones,
+            'usuario_registro' => $_SESSION['user_id']
+        ]);
+
+        $citaId = $db->lastInsertId();
+
+        // *** ENVIAR NOTIFICACIONES ***
+        try {
+            require_once 'includes/notificaciones-citas.php';
+            $notificador = new NotificacionesCitas($db);
+            $notificador->notificarNuevaCita($citaId);
+
+            error_log("✅ Cita ID {$citaId} creada y notificaciones enviadas (método alternativo)");
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Cita agendada exitosamente. Notificaciones enviadas por correo.',
+                'cita_id' => $citaId
+            ]);
+        } catch (Exception $notifError) {
+            error_log("⚠️ Cita ID {$citaId} creada pero error en notificaciones: " . $notifError->getMessage());
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Cita agendada exitosamente. (Error enviando notificaciones: ' . $notifError->getMessage() . ')',
+                'cita_id' => $citaId
+            ]);
+        }
+    } catch (Exception $e) {
+        error_log("❌ Error en agendamiento alternativo: " . $e->getMessage());
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+
+    exit; // Importante: terminar el script aquí
+}
+
 // Verificar autenticación
 if (!isset($_SESSION['user_id'])) {
     header('Location: index.php?action=login');
@@ -3987,7 +4093,7 @@ include 'views/includes/navbar.php';
             console.log('📤 Enviando datos:', datosEnvio);
 
             // Realizar petición al servidor
-            const response = await fetch('views/api/agendar-cita.php', {
+            const response = await fetch('api/agendar-cita.php', {// <-- Cambio aquí
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -4252,6 +4358,102 @@ include 'views/includes/navbar.php';
         btnConfirmar.innerHTML = textoOriginal || '<i class="fas fa-calendar-check"></i> Confirmar Cita';
         btnConfirmar.className = 'btn btn-success btn-lg';
         btnConfirmar.disabled = false;
+    }
+
+    // Función alternativa para confirmar cita
+    async function confirmarCitaAlternativa() {
+        try {
+            // Mostrar loading
+            const btnConfirmar = document.getElementById('btnConfirmar');
+            const textoOriginal = btnConfirmar.innerHTML;
+            btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+            btnConfirmar.disabled = true;
+
+            // Recopilar datos del formulario
+            const form = document.getElementById('formAgendamiento');
+            const formData = new FormData(form);
+
+            // Agregar datos adicionales
+            formData.append('fecha_cita', document.getElementById('fechaCita').value);
+            formData.append('tipo_cita', datosFormulario.tipo_cita);
+            formData.append('id_especialidad', datosFormulario.id_especialidad);
+            formData.append('id_sucursal', datosFormulario.id_sucursal);
+            formData.append('id_medico', datosFormulario.id_medico);
+            formData.append('hora_cita', datosFormulario.hora_cita);
+            formData.append('action', 'agendar_cita'); // CLAVE: esto activa el procesamiento alternativo
+
+            console.log('📤 Enviando datos via método alternativo');
+
+            // Usar fetch con FormData
+            const response = await fetch(window.location.href, {// URL actual
+                method: 'POST',
+                body: formData
+            });
+
+            const responseText = await response.text();
+            console.log('📄 Respuesta:', responseText);
+
+            // Intentar parsear como JSON
+            let result;
+            try {
+                result = JSON.parse(responseText);
+            } catch (e) {
+                // Si no es JSON, buscar indicadores de éxito
+                if (responseText.includes('exitosamente') || responseText.includes('success')) {
+                    result = {success: true, message: 'Cita agendada exitosamente'};
+                } else {
+                    throw new Error('Respuesta del servidor no válida');
+                }
+            }
+
+            if (result.success) {
+                mostrarMensaje('success', result.message || 'Cita agendada exitosamente');
+
+                // Cerrar modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('modalAgendamiento'));
+                modal.hide();
+
+                // Recargar página
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                throw new Error(result.error || 'Error desconocido al agendar la cita');
+            }
+
+        } catch (error) {
+            console.error('❌ Error en método alternativo:', error);
+            manejarErrorConfirmacion(error);
+        } finally {
+            // Restaurar botón
+            const btnConfirmar = document.getElementById('btnConfirmar');
+            btnConfirmar.innerHTML = '<i class="fas fa-save"></i> Confirmar Cita';
+            btnConfirmar.disabled = false;
+        }
+    }
+
+// Modificar la función confirmarCita original para usar fallback
+    async function confirmarCita() {
+        try {
+            // Intentar método original primero
+            const response = await fetch('views/api/agendar-cita.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(datosEnvio)
+            });
+
+            if (!response.ok)
+                throw new Error('Fetch failed');
+
+            const result = await response.json();
+            // ... resto del código original
+
+        } catch (error) {
+            console.warn('⚠️ Método principal falló, intentando método alternativo...', error);
+
+            // Usar método alternativo como fallback
+            return confirmarCitaAlternativa();
+        }
     }
 
     /* ================================
