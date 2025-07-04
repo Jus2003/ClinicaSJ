@@ -484,14 +484,34 @@ include 'views/includes/navbar.php';
                                                     <i class="fas fa-times"></i>
                                                 </button>
                                             <?php endif; ?>
+
+                                            <!-- Descargar PDF si existe -->
+                                            <?php if (isset($cita['estado_pago'])): ?>
+                                                <?php
+                                                // Verificar si existe PDF para esta cita
+                                                $sqlPdf = "SELECT id_pago, nombre_archivo, tipo_pdf FROM pagos WHERE id_cita = ? AND archivo_pdf IS NOT NULL";
+                                                $stmtPdf = $db->prepare($sqlPdf);
+                                                $stmtPdf->execute([$cita['id_cita']]);
+                                                $pdfInfo = $stmtPdf->fetch(PDO::FETCH_ASSOC);
+
+                                                if ($pdfInfo):
+                                                    ?>
+                                                    <a href="index.php?action=descargar_pdf&pago_id=<?= $pdfInfo['id_pago'] ?>" 
+                                                       class="btn btn-info btn-sm" 
+                                                       title="Descargar <?= $pdfInfo['tipo_pdf'] == 'orden_pago' ? 'Orden de Pago' : 'Comprobante' ?>">
+                                                        <i class="fas fa-file-pdf"></i>
+                                                    </a>
+                                                <?php endif; ?>
+        <?php endif; ?>
+
                                         </div>
                                     </td>
                                 </tr>
-                            <?php endforeach; ?>
+    <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-            <?php endif; ?>
+<?php endif; ?>
         </div>
     </div>
 </div>
