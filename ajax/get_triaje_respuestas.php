@@ -1,12 +1,15 @@
 <?php
 session_start();
-require_once '../models/TriajeModel.php';
-require_once '../config/database.php';
+require_once __DIR__ . '/../models/TriajeModel.php';
+require_once __DIR__ . '/../config/database.php';
+
+// Set header for JSON response
+header('Content-Type: application/json');
 
 // Verificar que sea médico o recepcionista
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role_id'], [2, 3])) {
     http_response_code(403);
-    echo json_encode(['error' => 'No autorizado']);
+    echo json_encode(['success' => false, 'error' => 'No autorizado']);
     exit;
 }
 
@@ -14,7 +17,7 @@ $citaId = $_GET['cita_id'] ?? null;
 
 if (!$citaId) {
     http_response_code(400);
-    echo json_encode(['error' => 'ID de cita requerido']);
+    echo json_encode(['success' => false, 'error' => 'ID de cita requerido']);
     exit;
 }
 
@@ -24,7 +27,7 @@ try {
     // Verificar permisos
     if (!$triajeModel->verificarPermisosCita($citaId, $_SESSION['user_id'], $_SESSION['role_id'])) {
         http_response_code(403);
-        echo json_encode(['error' => 'Sin permisos para esta cita']);
+        echo json_encode(['success' => false, 'error' => 'Sin permisos para esta cita']);
         exit;
     }
     
@@ -35,7 +38,7 @@ try {
     $respuestasTriaje = $triajeModel->getRespuestasTriaje($citaId);
     
     if (empty($respuestasTriaje)) {
-        echo json_encode(['error' => 'No hay triaje completado para esta cita']);
+        echo json_encode(['success' => false, 'error' => 'No hay triaje completado para esta cita']);
         exit;
     }
     
@@ -56,6 +59,6 @@ try {
     
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => 'Error del servidor: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor: ' . $e->getMessage()]);
 }
 ?>

@@ -653,27 +653,27 @@ include 'views/includes/navbar.php';
     }
 </style>
 
-<script>
-                                                            function verDetallesCita(citaId, citaData) {
-                                                            let cita;
-                                                            try {
-                                                            cita = JSON.parse(citaData);
+        <script>
+        function verDetallesCita(citaId, citaData) {
+        let cita;
+        try {
+        cita = JSON.parse(citaData);
                                                             } catch (e) {
-                                                            console.error('Error parsing cita data:', e);
-                                                            return;
+        console.error('Error parsing cita data:', e);
+        return;
                                                             }
-
+        
                                                             const content = `
        <div class="row">
-           <div class="col-md-6">
-               <h6 class="text-primary mb-3">
-                   <i class="fas fa-calendar-alt"></i> Información de la Cita
+        <div class="col-md-6">
+        <h6 class="text-primary mb-3">
+        <i class="fas fa-calendar-alt"></i> Información de la Cita
                </h6>
-               <table class="table table-sm">
-                   <tr><td><strong>ID:</strong></td><td>${cita.id_cita}</td></tr>
-                   <tr><td><strong>Fecha:</strong></td><td>${new Date(cita.fecha_cita).toLocaleDateString('es-ES')}</td></tr>
-                   <tr><td><strong>Hora:</strong></td><td>${cita.hora_cita}</td></tr>
-                   <tr><td><strong>Estado:</strong></td><td><span class="badge bg-info">${cita.estado_cita}</span></td></tr>
+        <table class="table table-sm">
+        <tr><td><strong>ID:</strong></td><td>${cita.id_cita}</td></tr>
+        <tr><td><strong>Fecha:</strong></td><td>${new Date(cita.fecha_cita).toLocaleDateString('es-ES')}</td></tr>
+        <tr><td><strong>Hora:</strong></td><td>${cita.hora_cita}</td></tr>
+                   <tr><td><strong> E stado:</strong></td><td><span  c lass="badge bg-info">${cita.estado_cita } </span></td></tr>
                    ${cita.tipo_cita ? `<tr><td><strong>Tipo:</strong></td><td>${cita.tipo_cita}</td></tr>` : ''}
                </table>
            </div>
@@ -705,41 +705,41 @@ include 'views/includes/navbar.php';
                     <h6 class="text-primary mb-3">
                    <i class="fas fa-credit-card"></i> Estado del Pago
                </h6>
-                    <div class="alert ${cita.estado_pago === 'pagado' ? 'alert-success' : 'alert-danger'} mb-0">
-                    <i class="fas fa-${cita.estado_pago === 'pagado' ? 'check-circle' : 'dollar-sign'}"></i>
+                <div class="alert ${cita.estado_pago === 'pagado' ? 'alert-success' : 'alert-danger'} mb-0">
+                <i class="fas fa-${cita.estado_pago === 'pagado' ? 'check-circle' : 'dollar-sign'}"></i>
                     ${cita.estado_pago.charAt(0).toUpperCase() + cita.estado_pago.slice(1)}
-               </div>
-           </div>
+                    </div>
+                    </div>
        </div>` : ''}
        
                         ${cita.motivo_consulta ? `
                         <div class="mt-3">
-                                                                    <h6 class="text-primary mb-3">
+                <h6 class="text-primary mb-3">
                <i class="fas fa-notes-medical"></i> Motivo de Consulta
            </h6>
-           <div class="alert alert-info mb-0">${cita.motivo_consulta}</div>
+                    <div class="alert alert-info mb-0">${cita.motivo_consulta}</div>
        </div>` : ''}
    `;
-                                                            document.getElementById('detallesContent').innerHTML = content;
-                                                            new bootstrap.Modal(document.getElementById('modalDetalles')).show();
-                                                            }
+                        document.getElementById('detallesContent').innerHTML = content;
+                new bootstrap.Modal(document.getElementById('modalDetalles')).show();
+                }
+                
+                function cancelarCita(citaId) {
+                document.getElementById('citaCancelarId').value = citaId;
+                        new bootstrap.Modal(document.getElementById('modalCancelar')).show();
+                }
 
-                                                            function cancelarCita(citaId) {
-                                                            document.getElementById('citaCancelarId').value = citaId;
-                                                            new bootstrap.Modal(document.getElementById('modalCancelar')).show();
-                                                            }
+                function completarCita(citaId) {
+                        document.getElementById('citaCompletarId').value = citaId;
+                        new bootstrap.Modal(document.getElementById('modalCompletar')).show();
+                }
 
-                                                            function completarCita(citaId) {
-                                                            document.getElementById('citaCompletarId').value = citaId;
-                                                            new bootstrap.Modal(document.getElementById('modalCompletar')).show();
-                                                            }
-
-                                                            function verTriaje(citaId) {
-                                                            // Mostrar modal
-                                                            const modal = new bootstrap.Modal(document.getElementById('triajeModal'));
-                                                            modal.show();
-                                                            // Mostrar loading
-                                                            document.getElementById('triajeModalContent').innerHTML = `
+                function verTriaje(citaId) {
+                // Mostrar modal
+                const modal = new bootstrap.Modal(document.getElementById('triajeModal'));
+                modal.show();
+                // Mostrar loading
+                document.getElementById('triajeModalContent').innerHTML = `
        <div class="text-center">
            <div class="spinner-border text-primary" role="status">
                <span class="visually-hidden">Cargando...</span>
@@ -748,7 +748,7 @@ include 'views/includes/navbar.php';
        </div>
    `;
                // Hacer petición AJAX
-               fetch(`ajax/get_triaje_respuestas.php?cita_id=${citaId}`)
+               fetch(`./ajax/get_triaje_respuestas.php?cita_id=${citaId}`)
                        .then(response => response.json())
                        .then(data => {
                        if (data.success) {
