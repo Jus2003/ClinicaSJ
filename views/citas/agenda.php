@@ -429,10 +429,15 @@ include 'views/includes/navbar.php';
                                                 <!-- Botones para Médicos -->
 
                                                 <!-- Ver Triaje -->
+                                                <!-- Ver Triaje con debug -->
                                                 <?php if (isset($cita['triaje_completado']) && $cita['triaje_completado']): ?>
-                                                    <a href="index.php?action=triaje_respuestas&cita_id=<?= $cita['id_cita'] ?>" 
+                                                    <?php
+                                                    // Debug temporal
+                                                    echo "<!-- DEBUG: ID de cita = " . ($cita['id_cita'] ?? 'NO DEFINIDO') . " -->";
+                                                    ?>
+                                                    <a href="index.php?action=consultas/triaje/ver&cita_id=<?= $cita['id_cita'] ?>" 
                                                        class="btn btn-info btn-sm" 
-                                                       title="Ver Triaje">
+                                                       title="Ver Triaje (ID: <?= $cita['id_cita'] ?>)">
                                                         <i class="fas fa-clipboard-list"></i>
                                                     </a>
                                                 <?php endif; ?>
