@@ -161,7 +161,7 @@ try {
     $stmt->execute($params);
     $citasBase = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Obtener datos de triaje y pago para TODAS las vistas (no solo pacientes y médicos)
+    // Obtener datos de triaje y pago para TODAS las vistas (no solo pacientes y médicos)
     foreach ($citasBase as $cita) {
         $citaCompleta = $cita;
 
@@ -279,14 +279,6 @@ include 'views/includes/navbar.php';
         </div>
     </div>
 
-    <!-- Debug temporal -->
-    <div class="alert alert-info">
-        <strong>Debug:</strong> 
-        Total citas únicas encontradas: <?= count($citas) ?> | 
-        Role ID: <?= $_SESSION['role_id'] ?> | 
-        Vista: <?= $vistaRol ?>
-    </div>
-
     <!-- Lista de citas -->
     <div class="card">
         <div class="card-header">
@@ -331,7 +323,6 @@ include 'views/includes/navbar.php';
                                 <tr>
                                     <td>
                                         <small class="text-muted">#<?= $cita['id_cita'] ?></small>
-                                        <small class="text-info d-block">[<?= $index + 1 ?>]</small>
                                     </td>
                                     <td>
                                         <strong><?= date('d/m/Y', strtotime($cita['fecha_cita'])) ?></strong>
@@ -412,7 +403,6 @@ include 'views/includes/navbar.php';
                                     <?php endif; ?>
 
                                     <!-- Columna Acciones -->
-                                    <!-- Columna Acciones -->
                                     <td>
                                         <div class="btn-group btn-group-sm">
 
@@ -439,12 +429,12 @@ include 'views/includes/navbar.php';
                                                 <!-- Botones para Médicos -->
 
                                                 <!-- Ver Triaje -->
-                                                <!-- Ver Triaje -->
                                                 <?php if (isset($cita['triaje_completado']) && $cita['triaje_completado']): ?>
-                                                    <a href="index.php?action=consultas/triaje/ver&cita_id=<?= $cita['id_cita'] ?>" 
-                                                       class="btn btn-info btn-sm" title="Ver Triaje">
+                                                    <button onclick="verTriaje(<?= $cita['id_cita'] ?>)" 
+                                                            class="btn btn-info btn-sm" 
+                                                            title="Ver Triaje">
                                                         <i class="fas fa-clipboard-list"></i>
-                                                    </a>
+                                                    </button>
                                                 <?php endif; ?>
 
                                                 <!-- Atender Paciente -->
@@ -502,7 +492,6 @@ include 'views/includes/navbar.php';
     </div>
 </div>
 
-<!-- Los modales permanecen igual... -->
 <!-- Modal Detalles -->
 <div class="modal fade" id="modalDetalles">
     <div class="modal-dialog modal-lg">
@@ -587,106 +576,325 @@ include 'views/includes/navbar.php';
     </div>
 </div>
 
-<script>
-// JavaScript igual al anterior...
-    function verDetallesCita(citaId, citaData) {
-        let cita;
-        try {
-            cita = JSON.parse(citaData);
-        } catch (e) {
-            console.error('Error parsing cita data:', e);
-            return;
-        }
-
-        const content = `
-        <div class="row">
-            <div class="col-md-6">
-                <h6 class="text-primary mb-3">
-                    <i class="fas fa-calendar-alt"></i> Información de la Cita
-                </h6>
-                <table class="table table-sm">
-                    <tr><td><strong>ID:</strong></td><td>${cita.id_cita}</td></tr>
-                    <tr><td><strong>Fecha:</strong></td><td>${new Date(cita.fecha_cita).toLocaleDateString('es-ES')}</td></tr>
-                    <tr><td><strong>Hora:</strong></td><td>${cita.hora_cita}</td></tr>
-                    <tr><td><strong>Estado:</strong></td><td><span class="badge bg-info">${cita.estado_cita}</span></td></tr>
-                    ${cita.tipo_cita ? `<tr><td><strong>Tipo:</strong></td><td>${cita.tipo_cita}</td></tr>` : ''}
-                </table>
+<!-- Modal para ver triaje -->
+<div class="modal fade" id="triajeModal" tabindex="-1" aria-labelledby="triajeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="triajeModalLabel">
+                    <i class="fas fa-clipboard-list"></i> Triaje Digital del Paciente
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="col-md-6">
-                <h6 class="text-primary mb-3">
-                    <i class="fas fa-users"></i> Participantes
-                </h6>
-                <table class="table table-sm">
-                    ${cita.paciente_nombre ? `<tr><td><strong>Paciente:</strong></td><td>${cita.paciente_nombre}</td></tr>` : ''}
-                    ${cita.medico_nombre ? `<tr><td><strong>Médico:</strong></td><td>Dr. ${cita.medico_nombre}</td></tr>` : ''}
-                    ${cita.nombre_especialidad ? `<tr><td><strong>Especialidad:</strong></td><td>${cita.nombre_especialidad}</td></tr>` : ''}
-                    ${cita.nombre_sucursal ? `<tr><td><strong>Sucursal:</strong></td><td>${cita.nombre_sucursal}</td></tr>` : ''}
-                </table>
+            <div class="modal-body" id="triajeModalContent">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-2">Cargando información del triaje...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cerrar
+                </button>
             </div>
         </div>
-        
-        ${cita.triaje_completado !== undefined ? `
-        <div class="row mt-3">
-            <div class="col-md-6">
-                <h6 class="text-primary mb-3">
-                    <i class="fas fa-clipboard-list"></i> Triaje Digital
-                </h6>
-                <div class="alert ${cita.triaje_completado ? 'alert-success' : 'alert-warning'} mb-0">
-                    <i class="fas fa-${cita.triaje_completado ? 'check-circle' : 'clock'}"></i>
-                    ${cita.triaje_completado ? 'Completado' : 'Pendiente'}
-                </div>
-            </div>
-            <div class="col-md-6">
-                <h6 class="text-primary mb-3">
-                    <i class="fas fa-credit-card"></i> Estado del Pago
-                </h6>
-                <div class="alert ${cita.estado_pago === 'pagado' ? 'alert-success' : 'alert-danger'} mb-0">
+    </div>
+</div>
+
+<style>
+    .triaje-respuesta {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-left: 4px solid #007bff;
+        margin-bottom: 15px;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .triaje-respuesta:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .triaje-pregunta {
+        color: #495057;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .triaje-answer {
+        background: white ;
+
+        border-radius: 6px;
+        padding: 12px;
+        border: 1px solid #dee2e6;
+    }
+
+    .triaje-number {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 15px;
+        flex-shrink: 0;
+    }
+
+    .patient-info-card {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        border-radius: 12px;
+        margin-bottom: 25px;
+    }
+</style>
+
+<script>
+                                                            function verDetallesCita(citaId, citaData) {
+                                                            let cita;
+                                                            try {
+                                                            cita = JSON.parse(citaData);
+                                                            } catch (e) {
+                                                            console.error('Error parsing cita data:', e);
+                                                            return;
+                                                            }
+
+                                                            const content = `
+       <div class="row">
+           <div class="col-md-6">
+               <h6 class="text-primary mb-3">
+                   <i class="fas fa-calendar-alt"></i> Información de la Cita
+               </h6>
+               <table class="table table-sm">
+                   <tr><td><strong>ID:</strong></td><td>${cita.id_cita}</td></tr>
+                   <tr><td><strong>Fecha:</strong></td><td>${new Date(cita.fecha_cita).toLocaleDateString('es-ES')}</td></tr>
+                   <tr><td><strong>Hora:</strong></td><td>${cita.hora_cita}</td></tr>
+                   <tr><td><strong>Estado:</strong></td><td><span class="badge bg-info">${cita.estado_cita}</span></td></tr>
+                   ${cita.tipo_cita ? `<tr><td><strong>Tipo:</strong></td><td>${cita.tipo_cita}</td></tr>` : ''}
+               </table>
+           </div>
+           <div class="col-md-6">
+               <h6 class="text-primary mb-3">
+                   <i class="fas fa-users"></i> Participantes
+               </h6>
+               <table class="table table-sm">
+                   ${cita.paciente_nombre ? `<tr><td><strong>Paciente:</strong></td><td>${cita.paciente_nombre}</td></tr>` : ''}
+        ${cita.medico_nombre ? `<tr><td><strong>Médico:</strong></td><td>Dr. ${cita.medico_nombre}</td></tr>` : ''}
+            ${cita.nombre_especialidad ? `<tr><td><strong>Especialidad:</strong></td><td>${cita.nombre_especialidad}</td></tr>` : ''}
+    ${cita.nombre_sucursal ? `<tr><td><strong>Sucursal:</strong></td><td>${cita.nombre_sucursal}</td></tr>` : ''}
+               </table>
+           </div>
+       </div>
+       
+            ${cita.triaje_completado !== undefined ? `
+       <div class="row mt-3">
+           <div class="col-md-6">
+            <h6 class="text-primary mb-3">
+                   <i class="fas fa-clipboard-list"></i> Triaje Digital
+    </h6>
+               <div class="alert ${cita.triaje_completado ? 'alert-success' : 'alert-warning'} mb-0">
+                <i class="fas fa-${cita.triaje_completado ? 'check-circle' : 'clock'}"></i>
+                ${cita.triaje_completado ? 'Completado' : 'Pendiente'}
+               </div>
+                    </div>
+                    <div class="col-md-6">
+                    <h6 class="text-primary mb-3">
+                   <i class="fas fa-credit-card"></i> Estado del Pago
+               </h6>
+                    <div class="alert ${cita.estado_pago === 'pagado' ? 'alert-success' : 'alert-danger'} mb-0">
                     <i class="fas fa-${cita.estado_pago === 'pagado' ? 'check-circle' : 'dollar-sign'}"></i>
                     ${cita.estado_pago.charAt(0).toUpperCase() + cita.estado_pago.slice(1)}
-                </div>
-            </div>
-        </div>` : ''}
-        
-        ${cita.motivo_consulta ? `
-        <div class="mt-3">
-            <h6 class="text-primary mb-3">
-                <i class="fas fa-notes-medical"></i> Motivo de Consulta
-            </h6>
-            <div class="alert alert-info mb-0">${cita.motivo_consulta}</div>
-        </div>` : ''}
-    `;
+               </div>
+           </div>
+       </div>` : ''}
+       
+                        ${cita.motivo_consulta ? `
+                        <div class="mt-3">
+                                                                    <h6 class="text-primary mb-3">
+               <i class="fas fa-notes-medical"></i> Motivo de Consulta
+           </h6>
+           <div class="alert alert-info mb-0">${cita.motivo_consulta}</div>
+       </div>` : ''}
+   `;
+                                                            document.getElementById('detallesContent').innerHTML = content;
+                                                            new bootstrap.Modal(document.getElementById('modalDetalles')).show();
+                                                            }
 
-        document.getElementById('detallesContent').innerHTML = content;
-        new bootstrap.Modal(document.getElementById('modalDetalles')).show();
-    }
+                                                            function cancelarCita(citaId) {
+                                                            document.getElementById('citaCancelarId').value = citaId;
+                                                            new bootstrap.Modal(document.getElementById('modalCancelar')).show();
+                                                            }
 
-    function cancelarCita(citaId) {
-        document.getElementById('citaCancelarId').value = citaId;
-        new bootstrap.Modal(document.getElementById('modalCancelar')).show();
-    }
+                                                            function completarCita(citaId) {
+                                                            document.getElementById('citaCompletarId').value = citaId;
+                                                            new bootstrap.Modal(document.getElementById('modalCompletar')).show();
+                                                            }
 
-    function completarCita(citaId) {
-        document.getElementById('citaCompletarId').value = citaId;
-        new bootstrap.Modal(document.getElementById('modalCompletar')).show();
-    }
+                                                            function verTriaje(citaId) {
+                                                            // Mostrar modal
+                                                            const modal = new bootstrap.Modal(document.getElementById('triajeModal'));
+                                                            modal.show();
+                                                            // Mostrar loading
+                                                            document.getElementById('triajeModalContent').innerHTML = `
+       <div class="text-center">
+           <div class="spinner-border text-primary" role="status">
+               <span class="visually-hidden">Cargando...</span>
+           </div>
+           <p class="mt-2">Cargando información del triaje...</p>
+       </div>
+   `;
+               // Hacer petición AJAX
+               fetch(`ajax/get_triaje_respuestas.php?cita_id=${citaId}`)
+                       .then(response => response.json())
+                       .then(data => {
+                       if (data.success) {
+                       mostrarTriaje(data);
+                       } else {
+                       mostrarError(data.error || 'Error desconocido');
+                       }
+                       })
+                       .catch(error => {
+                       console.error('Error:', error);
+                       mostrarError('Error de conexión');
+                       });
+               }
+
+               function mostrarTriaje(data) {
+               const { cita, edad, respuestas } = data;
+               let html = `
+       <div class="row">
+           <!-- Información del paciente -->
+           <div class="col-md-4">
+               <div class="patient-info-card p-4">
+                   <h6 class="mb-3">
+                       <i class="fas fa-user me-2"></i>
+                       Información del Paciente
+                   </h6>
+                   <div class="mb-2">
+                       <strong>Nombre:</strong><br>
+                       ${cita.paciente_nombre || 'N/A'}
+                   </div>
+                   <div class="mb-2">
+                       <strong>Cédula:</strong><br>
+                       ${cita.paciente_cedula || 'N/A'}
+                   </div>
+                   ${edad ? `
+                   <div class="mb-2">
+                       <strong>Edad:</strong><br>
+                       ${edad} años
+                   </div>
+                   ` : ''}
+                   ${cita.genero ? `
+                   <div class="mb-2">
+                       <strong>Género:</strong><br>
+                       ${cita.genero.charAt(0).toUpperCase() + cita.genero.slice(1)}
+                   </div>
+                   ` : ''}
+                   <div class="mb-2">
+                       <strong>Especialidad:</strong><br>
+                       ${cita.nombre_especialidad || 'N/A'}
+                   </div>
+                   <div class="mb-2">
+                       <strong>Fecha de Cita:</strong><br>
+                       ${new Date(cita.fecha_cita).toLocaleDateString('es-ES')} - ${cita.hora_cita}
+                   </div>
+                   ${respuestas.length > 0 ? `
+                   <div class="mt-3 p-2 bg-light rounded text-dark">
+                       <small>
+                           <i class="fas fa-clock me-1"></i>
+                           Triaje completado: ${new Date(respuestas[0].fecha_respuesta).toLocaleDateString('es-ES')} ${new Date(respuestas[0].fecha_respuesta).toLocaleTimeString('es-ES')}
+                       </small>
+                   </div>
+                   ` : ''}
+               </div>
+           </div>
+           
+           <!-- Respuestas del triaje -->
+           <div class="col-md-8">
+               <h6 class="mb-3">
+                   <i class="fas fa-clipboard-list me-2"></i>
+                   Respuestas del Triaje (${respuestas.length} preguntas)
+               </h6>
+               
+               <div class="triaje-respuestas" style="max-height: 400px; overflow-y: auto;">
+   `;
+   
+   if (respuestas.length === 0) {
+       html += `
+                   <div class="text-center py-4">
+                       <i class="fas fa-exclamation-circle text-warning" style="font-size: 2rem;"></i>
+                       <h6 class="mt-3 text-muted">Sin respuestas de triaje</h6>
+                       <p class="text-muted">El paciente aún no ha completado el triaje digital.</p>
+                   </div>
+       `;
+   } else {
+       respuestas.forEach((respuesta, index) => {
+           html += `
+                   <div class="triaje-respuesta p-3">
+                       <div class="d-flex align-items-start">
+                           <div class="triaje-number">
+                               ${index + 1}
+                           </div>
+                           <div class="flex-grow-1">
+                               <div class="triaje-pregunta">
+                                   ${respuesta.pregunta}
+                               </div>
+                               <div class="triaje-answer">
+                                   <strong>Respuesta:</strong> ${respuesta.respuesta}
+                                   ${respuesta.valor_numerico ? `
+                                   <span class="badge bg-primary ms-2">
+                                       Valor: ${respuesta.valor_numerico}
+                                   </span>
+                                   ` : ''}
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+           `;
+       });
+   }
+   
+   html += `
+               </div>
+           </div>
+       </div>
+   `;
+   
+   document.getElementById('triajeModalContent').innerHTML = html;
+}
+
+function mostrarError(mensaje) {
+   document.getElementById('triajeModalContent').innerHTML = `
+       <div class="text-center py-4">
+           <i class="fas fa-exclamation-triangle text-danger" style="font-size: 3rem;"></i>
+           <h6 class="mt-3 text-danger">Error al cargar el triaje</h6>
+           <p class="text-muted">${mensaje}</p>
+       </div>
+   `;
+}
 
 // Prevenir doble envío de formularios
-    document.addEventListener('DOMContentLoaded', function () {
-        const forms = document.querySelectorAll('form');
-        forms.forEach(form => {
-            form.addEventListener('submit', function () {
-                const submitButton = form.querySelector('button[type="submit"]');
-                if (submitButton) {
-                    submitButton.disabled = true;
-                    const originalText = submitButton.innerHTML;
-                    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+document.addEventListener('DOMContentLoaded', function () {
+   const forms = document.querySelectorAll('form');
+   forms.forEach(form => {
+       form.addEventListener('submit', function () {
+           const submitButton = form.querySelector('button[type="submit"]');
+           if (submitButton) {
+               submitButton.disabled = true;
+               const originalText = submitButton.innerHTML;
+               submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
 
-                    setTimeout(() => {
-                        submitButton.disabled = false;
-                        submitButton.innerHTML = originalText;
-                    }, 3000);
-                }
-            });
-        });
-    });
+               setTimeout(() => {
+                   submitButton.disabled = false;
+                   submitButton.innerHTML = originalText;
+               }, 3000);
+           }
+       });
+   });
+});
 </script>
+
