@@ -439,8 +439,9 @@ include 'views/includes/navbar.php';
                                                 <!-- Botones para Médicos -->
 
                                                 <!-- Ver Triaje -->
+                                                <!-- Ver Triaje -->
                                                 <?php if (isset($cita['triaje_completado']) && $cita['triaje_completado']): ?>
-                                                    <a href="index.php?action=consultas/triaje/ver_respuestas&cita_id=<?= $cita['id_cita'] ?>" 
+                                                    <a href="index.php?action=consultas/triaje/ver&cita_id=<?= $cita['id_cita'] ?>" 
                                                        class="btn btn-info btn-sm" title="Ver Triaje">
                                                         <i class="fas fa-clipboard-list"></i>
                                                     </a>

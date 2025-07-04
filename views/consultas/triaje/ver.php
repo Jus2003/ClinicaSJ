@@ -357,4 +357,3 @@ include 'views/includes/navbar.php';
     }
 </style>
 
-<?php include 'views/includes/footer.php'; ?>

@@ -79,8 +79,9 @@ class TriajeModel {
             $stmtDelete->execute(['cita_id' => $citaId]);
 
             // Insertar nuevas respuestas
-            $sqlInsert = "INSERT INTO triaje_respuestas (id_cita, id_pregunta, respuesta, tipo_triaje, fecha_respuesta, id_usuario_responde) 
-                      VALUES (:cita_id, :pregunta_id, :respuesta, :tipo_triaje, NOW(), :user_id)";
+            // CAMBIAR A:
+            $sqlInsert = "INSERT INTO triaje_respuestas (id_cita, id_pregunta, respuesta, tipo_triaje, fecha_respuesta, id_usuario_registro) 
+              VALUES (:cita_id, :pregunta_id, :respuesta, :tipo_triaje, NOW(), :user_id)";
             $stmtInsert = $this->db->prepare($sqlInsert);
 
             foreach ($respuestas as $preguntaId => $respuesta) {
@@ -105,11 +106,11 @@ class TriajeModel {
 
     // Obtener respuestas de triaje para una cita
     public function getRespuestasTriaje($citaId) {
-        $sql = "SELECT tr.*, pt.pregunta, pt.tipo_respuesta, pt.obligatoria, pt.orden
-            FROM triaje_respuestas tr
-            JOIN preguntas_triaje pt ON tr.id_pregunta = pt.id_pregunta
-            WHERE tr.id_cita = :cita_id
-            ORDER BY pt.orden ASC";
+        $sql = "SELECT tr.*, pt.pregunta, pt.tipo_pregunta, pt.obligatoria, pt.orden
+        FROM triaje_respuestas tr
+        JOIN preguntas_triaje pt ON tr.id_pregunta = pt.id_pregunta
+        WHERE tr.id_cita = :cita_id
+        ORDER BY pt.orden ASC";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['cita_id' => $citaId]);
@@ -147,12 +148,13 @@ class TriajeModel {
         $sql = "SELECT c.*, 
                    CONCAT(p.nombre, ' ', p.apellido) as paciente_nombre,
                    p.cedula as paciente_cedula,
+                   p.fecha_nacimiento,
+                   p.genero,
                    e.nombre_especialidad,
-                   s.nombre_sucursal
+                   c.motivo_consulta
             FROM citas c
             JOIN usuarios p ON c.id_paciente = p.id_usuario
             JOIN especialidades e ON c.id_especialidad = e.id_especialidad
-            JOIN sucursales s ON c.id_sucursal = s.id_sucursal
             WHERE c.id_cita = :cita_id";
 
         $stmt = $this->db->prepare($sql);
