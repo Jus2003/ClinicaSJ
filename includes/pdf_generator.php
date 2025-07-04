@@ -39,7 +39,7 @@ class PDFGenerator extends FPDF {
     
     // Función para convertir texto con tildes
     private function convertirTexto($texto) {
-        return iconv('UTF-8', 'windows-1252', $texto);
+        return iconv('UTF-8', 'windows-1252//IGNORE', $texto);
     }
     
     public function generarOrdenPago($datosCita, $datosPago) {
@@ -110,6 +110,14 @@ class PDFGenerator extends FPDF {
         $this->Cell(0, 6, $this->convertirTexto('2. El pago debe realizarse en efectivo exacto.'), 0, 1, 'L');
         $this->Cell(0, 6, $this->convertirTexto('3. Solicite su comprobante de pago al momento de cancelar.'), 0, 1, 'L');
         $this->Cell(0, 6, $this->convertirTexto('4. Esta orden es válida únicamente para la fecha y hora indicadas.'), 0, 1, 'L');
+        $this->Ln(10);
+        
+        // Nota importante
+        $this->SetFont('Times', 'B', 10);
+        $this->Cell(0, 8, $this->convertirTexto('IMPORTANTE:'), 0, 1, 'L');
+        $this->SetFont('Times', '', 9);
+        $this->Cell(0, 5, $this->convertirTexto('- El pago debe realizarse 15 minutos antes de la cita.'), 0, 1, 'L');
+        $this->Cell(0, 5, $this->convertirTexto('- En caso de no asistir, deberá reagendar su cita.'), 0, 1, 'L');
         
         return $this->Output('S');
     }
@@ -147,7 +155,7 @@ class PDFGenerator extends FPDF {
         $this->Cell(40, 6, $this->convertirTexto('Método:'), 0, 0, 'L');
         $this->Cell(0, 6, $this->convertirTexto(ucfirst($datosPago['metodo_pago'])), 0, 1, 'L');
         
-        if ($datosPago['numero_transaccion']) {
+        if (!empty($datosPago['numero_transaccion'])) {
             $this->Cell(40, 6, $this->convertirTexto('Transacción:'), 0, 0, 'L');
             $this->Cell(0, 6, $this->convertirTexto($datosPago['numero_transaccion']), 0, 1, 'L');
         }
@@ -188,14 +196,15 @@ class PDFGenerator extends FPDF {
         $this->SetFont('Times', 'B', 10);
         $this->Cell(140, 8, 'TOTAL PAGADO:', 1, 0, 'R');
         $this->Cell(50, 8, '$' . number_format($datosPago['monto'], 2), 1, 1, 'R');
-        $this->Ln(15);
+        $this->Ln(10);
         
-        // Mensaje de confirmación
+        // Información adicional
         $this->SetFont('Times', 'B', 12);
-        $this->Cell(0, 8, $this->convertirTexto('¡PAGO CONFIRMADO!'), 0, 1, 'C');
+        $this->Cell(0, 8, $this->convertirTexto('INFORMACIÓN ADICIONAL'), 0, 1, 'L');
         $this->SetFont('Times', '', 10);
-        $this->Cell(0, 6, $this->convertirTexto('Presente este comprobante el día de su cita médica.'), 0, 1, 'C');
-        $this->Cell(0, 6, $this->convertirTexto('Conserve este documento para futuras referencias.'), 0, 1, 'C');
+        $this->Cell(0, 6, $this->convertirTexto('- Presente este comprobante el día de su cita.'), 0, 1, 'L');
+        $this->Cell(0, 6, $this->convertirTexto('- Conserve este documento como respaldo del pago.'), 0, 1, 'L');
+        $this->Cell(0, 6, $this->convertirTexto('- En caso de cancelación, presente este comprobante.'), 0, 1, 'L');
         
         return $this->Output('S');
     }
