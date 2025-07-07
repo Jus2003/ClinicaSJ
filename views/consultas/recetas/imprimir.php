@@ -87,58 +87,44 @@ function calcularEdad($fechaNacimiento) {
     return $nacimiento->diff($hoy)->y . ' años';
 }
 
-// Crear clase PDF personalizada
+// Clase personalizada para la receta
 class RecetaPDF extends FPDF {
     private $receta;
     
-    public function __construct($receta) {
+    function __construct($receta) {
         parent::__construct();
         $this->receta = $receta;
     }
     
-    // Header de la página
+    // Encabezado de página
     function Header() {
         // Logo o nombre de la clínica
-        $this->SetFont('Arial', 'B', 16);
+        $this->SetFont('Arial', 'B', 20);
         $this->SetTextColor(0, 102, 204);
-        $this->Cell(0, 10, utf8_decode('Clínica San José'), 0, 1, 'C');
+        $this->Cell(0, 15, utf8_decode('CLÍNICA MÉDICA'), 0, 1, 'C');
         
-        // Información de la sucursal
-        $this->SetFont('Arial', '', 10);
-        $this->SetTextColor(80, 80, 80);
-        $this->Cell(0, 5, utf8_decode($this->receta['nombre_sucursal']), 0, 1, 'C');
-        $this->Cell(0, 5, utf8_decode($this->receta['sucursal_direccion']), 0, 1, 'C');
+        $this->SetFont('Arial', '', 12);
+        $this->SetTextColor(100, 100, 100);
+        $this->Cell(0, 8, utf8_decode($this->receta['nombre_sucursal']), 0, 1, 'C');
+        $this->Cell(0, 6, utf8_decode($this->receta['sucursal_direccion']), 0, 1, 'C');
+        $this->Cell(0, 6, utf8_decode('Teléfono: ' . $this->receta['sucursal_telefono']), 0, 1, 'C');
         
-        $contacto = '';
-        if ($this->receta['sucursal_telefono']) {
-            $contacto .= 'Tel: ' . $this->receta['sucursal_telefono'];
-        }
-        if ($this->receta['sucursal_email']) {
-            $contacto .= ($contacto ? ' | ' : '') . 'Email: ' . $this->receta['sucursal_email'];
-        }
-        if ($contacto) {
-            $this->Cell(0, 5, $contacto, 0, 1, 'C');
-        }
-        
-        // Línea separadora
-        $this->Ln(5);
-        $this->SetDrawColor(0, 102, 204);
-        $this->Line(10, $this->GetY(), 200, $this->GetY());
         $this->Ln(10);
         
-        // Título RECETA MÉDICA
+        // Título de receta
         $this->SetFont('Arial', 'B', 18);
         $this->SetTextColor(0, 0, 0);
-        $this->Cell(0, 10, utf8_decode('RECETA MÉDICA'), 0, 1, 'C');
+        $this->Cell(0, 12, utf8_decode('RECETA MÉDICA'), 0, 1, 'C');
+        
         $this->Ln(5);
     }
     
-    // Footer de la página
+    // Pie de página
     function Footer() {
         $this->SetY(-15);
         $this->SetFont('Arial', 'I', 8);
         $this->SetTextColor(128, 128, 128);
-        $this->Cell(0, 10, utf8_decode('Página ') . $this->PageNo() . ' - Generado el ' . date('d/m/Y H:i'), 0, 0, 'C');
+        $this->Cell(0, 10, utf8_decode('Receta médica - Generado el ' . date('d/m/Y H:i')), 0, 0, 'C');
     }
     
     // Función para agregar información en formato de tabla
@@ -246,18 +232,16 @@ $pdf->Cell(63, 8, utf8_decode('Cantidad'), 1, 1, 'C', true);
 
 $pdf->Cell(63, 8, utf8_decode($receta['concentracion'] ?: 'N/E'), 1, 0, 'C');
 $pdf->Cell(64, 8, utf8_decode($receta['forma_farmaceutica'] ?: 'N/E'), 1, 0, 'C');
-$pdf->Cell(63, 8, utf8_decode($receta['cantidad']), 1, 1, 'C');
-
-$pdf->Ln(2);
+$pdf->Cell(63, 8, utf8_decode($receta['cantidad'] ?: 'N/E'), 1, 1, 'C');
 
 // Fila 2
 $pdf->Cell(63, 8, utf8_decode('Dosis'), 1, 0, 'C', true);
 $pdf->Cell(64, 8, utf8_decode('Frecuencia'), 1, 0, 'C', true);
 $pdf->Cell(63, 8, utf8_decode('Duración'), 1, 1, 'C', true);
 
-$pdf->Cell(63, 8, utf8_decode($receta['dosis']), 1, 0, 'C');
-$pdf->Cell(64, 8, utf8_decode($receta['frecuencia']), 1, 0, 'C');
-$pdf->Cell(63, 8, utf8_decode($receta['duracion']), 1, 1, 'C');
+$pdf->Cell(63, 8, utf8_decode($receta['dosis'] ?: 'N/E'), 1, 0, 'C');
+$pdf->Cell(64, 8, utf8_decode($receta['frecuencia'] ?: 'N/E'), 1, 0, 'C');
+$pdf->Cell(63, 8, utf8_decode($receta['duracion'] ?: 'N/E'), 1, 1, 'C');
 
 $pdf->Ln(5);
 
@@ -267,58 +251,40 @@ if ($receta['indicaciones_especiales']) {
 }
 
 // Información de la consulta
-if ($receta['diagnostico_principal']) {
-    $pdf->addMultilineText('DIAGNÓSTICO:', $receta['diagnostico_principal']);
-}
-
-// Fechas importantes
-$pdf->addInfoSection('INFORMACIÓN ADICIONAL', [
+$pdf->addInfoSection('INFORMACIÓN DE LA CONSULTA', [
     'Fecha de Consulta' => date('d/m/Y', strtotime($receta['fecha_cita'])),
-    'Fecha de Emisión' => date('d/m/Y H:i', strtotime($receta['fecha_emision'])),
-    'Fecha de Vencimiento' => date('d/m/Y', strtotime($receta['fecha_vencimiento'])),
-    'Estado' => ucfirst($receta['estado'])
+    'Diagnóstico' => $receta['diagnostico_principal'],
+    'Motivo' => $receta['motivo_consulta']
 ]);
 
-// Advertencias legales
-$pdf->Ln(5);
+// Información adicional
 $pdf->SetFont('Arial', 'B', 10);
-$pdf->SetTextColor(220, 20, 20);
-$pdf->Cell(0, 6, utf8_decode('ADVERTENCIAS IMPORTANTES:'), 0, 1, 'L');
+$pdf->SetTextColor(204, 0, 0);
+$pdf->Cell(0, 6, utf8_decode('INFORMACIÓN IMPORTANTE:'), 0, 1, 'L');
 
 $pdf->SetFont('Arial', '', 9);
 $pdf->SetTextColor(0, 0, 0);
-$advertencias = [
-    '• Siga exactamente las indicaciones del médico',
-    '• No suspenda el tratamiento sin consultar',
-    '• Si presenta efectos adversos, consulte inmediatamente',
-    '• Conserve en lugar fresco y seco',
-    '• Mantenga fuera del alcance de los niños',
-    '• Esta receta tiene validez hasta la fecha de vencimiento indicada'
-];
+$pdf->Cell(0, 5, utf8_decode('• Esta receta es válida hasta: ' . date('d/m/Y', strtotime($receta['fecha_vencimiento']))), 0, 1, 'L');
+$pdf->Cell(0, 5, utf8_decode('• Estado actual: ' . strtoupper($receta['estado'])), 0, 1, 'L');
+$pdf->Cell(0, 5, utf8_decode('• Siga las indicaciones médicas al pie de la letra'), 0, 1, 'L');
+$pdf->Cell(0, 5, utf8_decode('• En caso de reacciones adversas, suspenda el medicamento y consulte'), 0, 1, 'L');
 
-foreach ($advertencias as $advertencia) {
-    $pdf->Cell(0, 4, utf8_decode($advertencia), 0, 1, 'L');
-}
+$pdf->Ln(10);
 
-// Línea de firma (solo si es receta activa)
-if ($receta['estado'] === 'activa') {
-    $pdf->Ln(10);
-    $pdf->SetFont('Arial', '', 10);
-    $pdf->Cell(0, 6, utf8_decode('_______________________________'), 0, 1, 'R');
-    $pdf->Cell(0, 6, utf8_decode('Firma del Médico'), 0, 1, 'R');
-    $pdf->Cell(0, 6, utf8_decode($receta['medico_nombre']), 0, 1, 'R');
-    $pdf->Cell(0, 6, utf8_decode($receta['nombre_especialidad']), 0, 1, 'R');
-}
+// Línea de firma
+$pdf->SetFont('Arial', '', 10);
+$pdf->Cell(0, 5, utf8_decode('_________________________________'), 0, 1, 'R');
+$pdf->Cell(0, 5, utf8_decode('Firma y sello del médico'), 0, 1, 'R');
+$pdf->Cell(0, 5, utf8_decode('Dr(a). ' . $receta['medico_nombre']), 0, 1, 'R');
 
-// Configurar headers para descarga
-$filename = 'Receta_' . $receta['codigo_receta'] . '_' . date('Y-m-d') . '.pdf';
+// Configurar headers para descarga del PDF
+$filename = 'Receta_' . $receta['codigo_receta'] . '_' . date('Ymd') . '.pdf';
 
 header('Content-Type: application/pdf');
-header('Content-Disposition: attachment; filename="' . $filename . '"');
+header('Content-Disposition: inline; filename="' . $filename . '"');
 header('Cache-Control: private, max-age=0, must-revalidate');
 header('Pragma: public');
 
-// Salida del PDF
-$pdf->Output('D', $filename);
-exit;
+// Generar y mostrar el PDF
+$pdf->Output('I', $filename);
 ?>

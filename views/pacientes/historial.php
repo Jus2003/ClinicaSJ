@@ -552,14 +552,7 @@ include 'views/includes/navbar.php';
                                                         <?php endif; ?>
 
                                                         <?php if ($consulta['estado_cita'] === 'completada'): ?>
-                                                            <div class="mt-3 d-flex gap-2">
-                                                                <button class="btn btn-sm btn-outline-primary" onclick="verRecetas(<?php echo $consulta['id_cita']; ?>)">
-                                                                    <i class="fas fa-prescription"></i> Ver Recetas
-                                                                </button>
-                                                                <button class="btn btn-sm btn-outline-info" onclick="verDetalles(<?php echo $consulta['id_cita']; ?>)">
-                                                                    <i class="fas fa-eye"></i> Ver Detalles
-                                                                </button>
-                                                            </div>
+                                                            
                                                         <?php endif; ?>
                                                     </div>
                                                 </div>
@@ -625,56 +618,314 @@ include 'views/includes/navbar.php';
 
 <script>
 // Filtros para el historial
-    document.getElementById('filtroEspecialidad').addEventListener('change', filtrarHistorial);
-    document.getElementById('filtroEstadoHistorial').addEventListener('change', filtrarHistorial);
+                                                                    document.getElementById('filtroEspecialidad').addEventListener('change', filtrarHistorial);
+                                                                    document.getElementById('filtroEstadoHistorial').addEventListener('change', filtrarHistorial);
 
-    function filtrarHistorial() {
-        const especialidad = document.getElementById('filtroEspecialidad').value;
-        const estado = document.getElementById('filtroEstadoHistorial').value;
+                                                                    function filtrarHistorial() {
+                                                                        const especialidad = document.getElementById('filtroEspecialidad').value;
+                                                                        const estado = document.getElementById('filtroEstadoHistorial').value;
 
-        const items = document.querySelectorAll('.timeline-item');
-        let visibles = 0;
+                                                                        const items = document.querySelectorAll('.timeline-item');
+                                                                        let visibles = 0;
 
-        items.forEach(item => {
-            const itemEspecialidad = item.getAttribute('data-especialidad');
-            const itemEstado = item.getAttribute('data-estado');
+                                                                        items.forEach(item => {
+                                                                            const itemEspecialidad = item.getAttribute('data-especialidad');
+                                                                            const itemEstado = item.getAttribute('data-estado');
 
-            const coincideEspecialidad = !especialidad || itemEspecialidad === especialidad;
-            const coincideEstado = !estado || itemEstado === estado;
+                                                                            const coincideEspecialidad = !especialidad || itemEspecialidad === especialidad;
+                                                                            const coincideEstado = !estado || itemEstado === estado;
 
-            if (coincideEspecialidad && coincideEstado) {
-                item.style.display = '';
-                visibles++;
-            } else {
-                item.style.display = 'none';
-            }
-        });
+                                                                            if (coincideEspecialidad && coincideEstado) {
+                                                                                item.style.display = '';
+                                                                                visibles++;
+                                                                            } else {
+                                                                                item.style.display = 'none';
+                                                                            }
+                                                                        });
 
-        // Mostrar mensaje si no hay resultados
-        const timeline = document.querySelector('.timeline');
-        let noResultsMsg = document.getElementById('no-results-msg');
+                                                                        // Mostrar mensaje si no hay resultados
+                                                                        const timeline = document.querySelector('.timeline');
+                                                                        let noResultsMsg = document.getElementById('no-results-msg');
 
-        if (visibles === 0 && items.length > 0) {
-            if (!noResultsMsg) {
-                noResultsMsg = document.createElement('div');
-                noResultsMsg.id = 'no-results-msg';
-                noResultsMsg.className = 'text-center py-3 text-muted';
-                noResultsMsg.innerHTML = '<i class="fas fa-search"></i> No se encontraron consultas con los filtros seleccionados';
-                timeline.appendChild(noResultsMsg);
-            }
-            noResultsMsg.style.display = 'block';
-        } else if (noResultsMsg) {
-            noResultsMsg.style.display = 'none';
-        }
+                                                                        if (visibles === 0 && items.length > 0) {
+                                                                            if (!noResultsMsg) {
+                                                                                noResultsMsg = document.createElement('div');
+                                                                                noResultsMsg.id = 'no-results-msg';
+                                                                                noResultsMsg.className = 'text-center py-3 text-muted';
+                                                                                noResultsMsg.innerHTML = '<i class="fas fa-search"></i> No se encontraron consultas con los filtros seleccionados';
+                                                                                timeline.appendChild(noResultsMsg);
+                                                                            }
+                                                                            noResultsMsg.style.display = 'block';
+                                                                        } else if (noResultsMsg) {
+                                                                            noResultsMsg.style.display = 'none';
+                                                                        }
+                                                                    }
+
+                                                                    function verRecetas(citaId) {
+                                                                        // Hacer petición AJAX para obtener las recetas
+                                                                        fetch(`ajax/obtener_recetas.php?cita_id=${citaId}`)
+                                                                                .then(response => response.json())
+                                                                                .then(data => {
+                                                                                    if (data.success) {
+                                                                                        mostrarModalRecetas(data.recetas, citaId);
+                                                                                    } else {
+                                                                                        alert('Error: ' + data.message);
+                                                                                    }
+                                                                                })
+                                                                                .catch(error => {
+                                                                                    console.error('Error:', error);
+                                                                                    alert('Error al cargar las recetas');
+                                                                                });
+                                                                    }
+
+                                                                    function verDetalles(citaId) {
+                                                                        // Hacer petición AJAX para obtener los detalles completos
+                                                                        fetch(`ajax/obtener_detalles_cita.php?cita_id=${citaId}`)
+                                                                                .then(response => response.json())
+                                                                                .then(data => {
+                                                                                    if (data.success) {
+                                                                                        mostrarModalDetalles(data.detalles, citaId);
+                                                                                    } else {
+                                                                                        alert('Error: ' + data.message);
+                                                                                    }
+                                                                                })
+                                                                                .catch(error => {
+                                                                                    console.error('Error:', error);
+                                                                                    alert('Error al cargar los detalles');
+                                                                                });
+                                                                    }
+
+                                                                    function mostrarModalRecetas(recetas, citaId) {
+                                                                        let contenidoRecetas = '';
+
+                                                                        if (recetas.length === 0) {
+                                                                            contenidoRecetas = `
+            <div class="text-center py-4">
+                <i class="fas fa-prescription-bottle fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No hay recetas registradas</h5>
+                <p class="text-muted">Esta consulta no tiene recetas médicas asociadas.</p>
+            </div>
+        `;
+                                                                            } else {
+                                                                            recetas.forEach((receta, index) => {
+                                                                                const estadoBadge = receta.estado === 'activa' ? 'success' :
+                                                                                        receta.estado === 'dispensada' ? 'info' :
+                                                                                        rec e ta.estado === 'vencida' ? 'warnin g ' : 'danger';
+
+                                                                                contenidoRecetas += `
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="fas fa-pills me-2"></i>
+                            ${receta.medicamento}
+                            ${receta.concentracion ? `<small class="text-muted">(${receta.concentracion})</small>` : ''}
+                                                                            </h6>
+                                        <span class="badge bg-${estadoBadge}">${receta.estado.toUpperCase()}</span>
+                                </div>
+                    <div class="card-body">
+                                    <div class="row">
+                            <div class="col-md-6">
+                                                                            <p><strong>Código:</strong> ${receta.codigo_receta}</p>
+                                <p><strong>Forma farmacéutica:</strong> ${receta.forma_farmaceutica || 'No especificada'}</p>
+                                <p><strong>Dosis:</strong> ${receta.dosis}</p>
+                                                                            <p><strong>Frecuencia:</strong> ${receta.frecuencia}</p>
+                            </div>
+                                    <div class="col-md-6">
+                                            <p><strong>Duración:</strong> ${receta.duracion}</p>
+                                            <p><strong>Cantidad:</strong> ${receta.cantidad}</p>
+                                            <p><strong>Fecha emisión:</strong> ${new Date(receta.fecha_emision).toLocaleDateString()}</p>
+                                                <p><strong>Válida hasta:</strong> ${new Date(receta.fecha_vencimiento).toLocaleDateString()}</p>
+                                            </div>
+                                                </div>
+                                            ${receta.indicaciones_especiales ? `
+                                            <div class="mt-3">
+                                        <strong>Indicaciones especiales:</strong>
+                                    <p class="text-muted mb-0">${receta.indicaciones_especiales}</p>
+                            </div>
+                                ` : ''}
+                    </div>
+                </div>
+            `;
+                                    });
+                                        }
+
+                                            // Crear y mostrar el modal
+                                            const modalHtml = `
+                                            <div class="modal fade" id="modalRecetas" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                                    <h5 class="modal-title">
+                            <i class="fas fa-prescription-bottle me-2"></i>
+                            Recetas Médicas - Cita #${citaId}
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                            ${contenidoRecetas}
+                            </div>
+                                                                            <div class="modal-footer">
+                                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                                </div>
+                </div>
+                                </div>
+        </div>
+    `;
+
+                                    // Eliminar modal anterior si existe
+                                        const modalExistente = document.getElementById('modalRecetas');
+                                        if (modalExistente) {
+                                        modalExistente.remove();
+                                        }
+
+                                        // Agregar modal al DOM y mostrarlo
+                                            document.body.insertAdjacentHTML('beforeend', modalHtml);
+                                                                            const modal = new bootstrap.Modal(document.getElementById('modalRecetas'));
+                                                                        modal.show();
+                                                                    }
+
+                                                                    function mostrarModalDetalles(detalles, citaId) {
+                                                                    const modalHtml = `
+                                                                            <div class="modal fade" id="modalDetalles" tabindex="-1">
+                                        <div class="modal-dialog modal-xl">
+                                        <div class="modal-content">
+                                        <div class="modal-header bg-info text-white">
+                                <h5 class="modal-title">
+                        <i class="fas fa-file-medical me-2"></i>
+                            Detalles Completos - Cita #${citaId}
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <!-- Información de la Cita -->
+                            <div class="col-md-6 mb-4">
+                                <h6 class="text-primary border-bottom pb-2">
+                                    <i class="fas fa-calendar-alt me-2"></i>Información de la Cita
+                                </h6>
+                                <table class="table table-sm">
+                                    <tr><td><strong>Fecha:</strong></td><td>${new Date(detalles.fecha_cita).toLocaleDateString()}</td></tr>
+                                    <tr><td><strong>Hora:</strong></td><td>${detalles.hora_cita}</td></tr>
+                                    <tr><td><strong>Tipo:</strong></td><td>${detalles.tipo_cita}</td></tr>
+                                    <tr><td><strong>Estado:</strong></td><td>
+                                        <span class="badge bg-${detalles.estado_cita === 'completada' ? 'success' : 'secondary'}">
+                                            ${detalles.estado_cita.toUpperCase()}
+                                        </span>
+                                    </td></tr>
+                                    <tr><td><strong>Sucursal:</strong></td><td>${detalles.nombre_sucursal}</td></tr>
+                                </table>
+                            </div>
+
+                            <!-- Información del Médico -->
+                            <div class="col-md-6 mb-4">
+                                <h6 class="text-primary border-bottom pb-2">
+                                    <i class="fas fa-user-md me-2"></i>Información del Médico
+                                </h6>
+                                <table class="table table-sm">
+                                    <tr><td><strong>Médico:</strong></td><td>${detalles.nombre_medico}</td></tr>
+                                    <tr><td><strong>Especialidad:</strong></td><td>${detalles.nombre_especialidad}</td></tr>
+                                    <tr><td><strong>Contacto:</strong></td><td>${detalles.medico_telefono || 'No disponible'}</td></tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Motivo de Consulta -->
+                        ${detalles.motivo_consulta ? `
+                            <div class="mb-4">
+                                <h6 class="text-primary border-bottom pb-2">
+                                    <i class="fas fa-question-circle me-2"></i>Motivo de Consulta
+                                </h6>
+                                <p class="text-muted">${detalles.motivo_consulta}</p>
+                            </div>
+                        ` : ''}
+
+                        <!-- Diagnóstico y Tratamiento -->
+                        ${detalles.diagnostico_principal || detalles.tratamiento ? `
+                            <div class="row mb-4">
+                                ${detalles.diagnostico_principal ? `
+                                    <div class="col-md-6">
+                                        <h6 class="text-primary border-bottom pb-2">
+                                            <i class="fas fa-diagnoses me-2"></i>Diagnóstico Principal
+                                        </h6>
+                                        <p class="text-muted">${detalles.diagnostico_principal}</p>
+                                    </div>
+                                ` : ''}
+                                ${detalles.tratamiento ? `
+                                    <div class="col-md-6">
+                                        <h6 class="text-primary border-bottom pb-2">
+                                            <i class="fas fa-procedures me-2"></i>Tratamiento
+                                        </h6>
+                                        <p class="text-muted">${detalles.tratamiento}</p>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        ` : ''}
+
+                        <!-- Observaciones Médicas -->
+                        ${detalles.observaciones_medicas ? `
+                            <div class="mb-4">
+                                <h6 class="text-primary border-bottom pb-2">
+                                    <i class="fas fa-notes-medical me-2"></i>Observaciones Médicas
+                                </h6>
+                                <p class="text-muted">${detalles.observaciones_medicas}</p>
+                            </div>
+                        ` : ''}
+
+                        <!-- Signos Vitales -->
+                        ${detalles.signos_vitales ? `
+                            <div class="mb-4">
+                                <h6 class="text-primary border-bottom pb-2">
+                                    <i class="fas fa-heartbeat me-2"></i>Signos Vitales
+                                </h6>
+                                <div class="row">
+                                    ${detalles.signos_vitales.presion_arterial ? `
+                                        <div class="col-md-3">
+                                            <strong>Presión Arterial:</strong><br>
+                                            <span class="text-muted">${detalles.signos_vitales.presion_arterial} mmHg</span>
+                                        </div>
+                                    ` : ''}
+                                    ${detalles.signos_vitales.frecuencia_cardiaca ? `
+                                        <div class="col-md-3">
+                                            <strong>Frecuencia Cardíaca:</strong><br>
+                                            <span class="text-muted">${detalles.signos_vitales.frecuencia_cardiaca} bpm</span>
+                                        </div>
+                                    ` : ''}
+                                    ${detalles.signos_vitales.temperatura ? `
+                                        <div class="col-md-3">
+                                            <strong>Temperatura:</strong><br>
+                                            <span class="text-muted">${detalles.signos_vitales.temperatura} °C</span>
+                                        </div>
+                                    ` : ''}
+                                    ${detalles.signos_vitales.peso ? `
+                                        <div class="col-md-3">
+                                            <strong>Peso:</strong><br>
+                                            <span class="text-muted">${detalles.signos_vitales.peso} kg</span>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" onclick="verRecetas(${citaId})">
+                            <i class="fas fa-prescription-bottle me-1"></i>Ver Recetas
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Eliminar modal anterior si existe
+    const modalExistente = document.getElementById('modalDetalles');
+    if (modalExistente) {
+        modalExistente.remove();
     }
 
-    function verRecetas(citaId) {
-        // Implementar modal o redirección para ver recetas de la cita
-        alert('Funcionalidad de ver recetas - Por implementar para cita ID: ' + citaId);
-    }
-
-    function verDetalles(citaId) {
-        // Implementar modal con detalles completos de la consulta
-        alert('Funcionalidad de ver detalles - Por implementar para cita ID: ' + citaId);
-    }
+    // Agregar modal al DOM y mostrarlo
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('modalDetalles'));
+    modal.show();
+}
 </script>

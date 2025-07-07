@@ -327,6 +327,336 @@ class Cita {
 
         return $result ? $result['precio_consulta'] : 35.00; // Precio por defecto
     }
+
+    public function getCitasVirtualesMedico($medicoId) {
+        $sql = "SELECT c.*, 
+                       CONCAT(p.nombre, ' ', p.apellido) as paciente_nombre,
+                       CONCAT(m.nombre, ' ', m.apellido) as medico_nombre,
+                       e.nombre_especialidad,
+                       s.nombre_sucursal
+                FROM citas c
+                INNER JOIN usuarios p ON c.id_paciente = p.id_usuario
+                INNER JOIN usuarios m ON c.id_medico = m.id_usuario
+                INNER JOIN especialidades e ON c.id_especialidad = e.id_especialidad
+                INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
+                WHERE c.id_medico = :medico_id 
+                AND c.tipo_cita = 'virtual'
+                AND c.fecha_cita >= CURDATE() - INTERVAL 7 DAY
+                ORDER BY c.fecha_cita ASC, c.hora_cita ASC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':medico_id', $medicoId);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Obtener citas virtuales de un paciente
+     */
+    public function getCitasVirtualesPaciente($pacienteId) {
+        $sql = "SELECT c.*, 
+                       CONCAT(p.nombre, ' ', p.apellido) as paciente_nombre,
+                       CONCAT(m.nombre, ' ', m.apellido) as medico_nombre,
+                       e.nombre_especialidad,
+                       s.nombre_sucursal
+                FROM citas c
+                INNER JOIN usuarios p ON c.id_paciente = p.id_usuario
+                INNER JOIN usuarios m ON c.id_medico = m.id_usuario
+                INNER JOIN especialidades e ON c.id_especialidad = e.id_especialidad
+                INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
+                WHERE c.id_paciente = :paciente_id 
+                AND c.tipo_cita = 'virtual'
+                ORDER BY c.fecha_cita DESC, c.hora_cita DESC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':paciente_id', $pacienteId);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Generar enlace único para videollamada
+     */
+    public function generarEnlaceVirtual($citaId) {
+        // Verificar que la cita existe y es virtual
+        $sqlVerificar = "SELECT id_cita FROM citas WHERE id_cita = :cita_id AND tipo_cita = 'virtual'";
+        $stmtVerificar = $this->conn->prepare($sqlVerificar);
+        $stmtVerificar->bindParam(':cita_id', $citaId);
+        $stmtVerificar->execute();
+
+        if ($stmtVerificar->rowCount() == 0) {
+            throw new Exception("Cita no encontrada o no es virtual");
+        }
+
+        // Generar ID único para la sala
+        $salaId = 'clinica_virtual_' . $citaId . '_' . time();
+        $enlaceCompleto = 'https://meet.jit.si/' . $salaId;
+
+        // Actualizar la cita con el enlace
+        $sqlActualizar = "UPDATE citas SET enlace_virtual = :enlace WHERE id_cita = :cita_id";
+        $stmtActualizar = $this->conn->prepare($sqlActualizar);
+        $stmtActualizar->bindParam(':enlace', $enlaceCompleto);
+        $stmtActualizar->bindParam(':cita_id', $citaId);
+
+        if (!$stmtActualizar->execute()) {
+            throw new Exception("Error al generar enlace virtual");
+        }
+
+        return $enlaceCompleto;
+    }
+
+    /**
+     * Verificar acceso a consulta virtual
+     */
+    public function verificarAccesoConsultaVirtual($citaId, $userId, $userRole) {
+        $whereCondition = '';
+
+        if ($userRole == 3) { // Médico
+            $whereCondition = "AND c.id_medico = :user_id";
+        } elseif ($userRole == 4) { // Paciente
+            $whereCondition = "AND c.id_paciente = :user_id";
+        } else {
+            return false;
+        }
+
+        $sql = "SELECT c.*, 
+                       CONCAT(p.nombre, ' ', p.apellido) as paciente_nombre,
+                       CONCAT(m.nombre, ' ', m.apellido) as medico_nombre,
+                       e.nombre_especialidad
+                FROM citas c
+                INNER JOIN usuarios p ON c.id_paciente = p.id_usuario
+                INNER JOIN usuarios m ON c.id_medico = m.id_usuario
+                INNER JOIN especialidades e ON c.id_especialidad = e.id_especialidad
+                WHERE c.id_cita = :cita_id 
+                AND c.tipo_cita = 'virtual' 
+                {$whereCondition}";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':cita_id', $citaId);
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->execute();
+
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Iniciar consulta virtual
+     */
+    public function iniciarConsultaVirtual($citaId) {
+        $sql = "UPDATE citas SET estado_cita = 'en_curso' WHERE id_cita = :cita_id AND estado_cita = 'confirmada'";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':cita_id', $citaId);
+
+        if (!$stmt->execute()) {
+            throw new Exception("Error al iniciar consulta virtual");
+        }
+
+        return true;
+    }
+
+    /**
+     * Finalizar consulta virtual
+     */
+    public function finalizarConsultaVirtual($citaId) {
+        $sql = "UPDATE citas SET estado_cita = 'completada' WHERE id_cita = :cita_id AND estado_cita = 'en_curso'";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':cita_id', $citaId);
+
+        if (!$stmt->execute()) {
+            throw new Exception("Error al finalizar consulta virtual");
+        }
+
+        return true;
+    }
+
+    public function getHistorialVirtualMedico($medicoId, $buscar = '', $estado = 'todas', $fechaDesde = '', $fechaHasta = '', $limit = 15, $offset = 0) {
+        $whereConditions = ["c.id_medico = :medico_id", "c.tipo_cita = 'virtual'"];
+        $params = ['medico_id' => $medicoId];
+
+        if ($buscar) {
+            $whereConditions[] = "(CONCAT(p.nombre, ' ', p.apellido) LIKE :buscar OR p.cedula LIKE :buscar)";
+            $params['buscar'] = "%{$buscar}%";
+        }
+
+        if ($estado !== 'todas') {
+            $whereConditions[] = "c.estado_cita = :estado";
+            $params['estado'] = $estado;
+        }
+
+        if ($fechaDesde) {
+            $whereConditions[] = "c.fecha_cita >= :fecha_desde";
+            $params['fecha_desde'] = $fechaDesde;
+        }
+
+        if ($fechaHasta) {
+            $whereConditions[] = "c.fecha_cita <= :fecha_hasta";
+            $params['fecha_hasta'] = $fechaHasta;
+        }
+
+        $whereClause = implode(' AND ', $whereConditions);
+
+        $sql = "SELECT c.*, 
+                   CONCAT(p.nombre, ' ', p.apellido) as paciente_nombre,
+                   p.cedula as paciente_cedula,
+                   CONCAT(m.nombre, ' ', m.apellido) as medico_nombre,
+                   e.nombre_especialidad
+            FROM citas c
+            INNER JOIN usuarios p ON c.id_paciente = p.id_usuario
+            INNER JOIN usuarios m ON c.id_medico = m.id_usuario
+            INNER JOIN especialidades e ON c.id_especialidad = e.id_especialidad
+            WHERE {$whereClause}
+            ORDER BY c.fecha_cita DESC, c.hora_cita DESC
+            LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->conn->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Contar historial de consultas virtuales para médico
+     */
+    public function countHistorialVirtualMedico($medicoId, $buscar = '', $estado = 'todas', $fechaDesde = '', $fechaHasta = '') {
+        $whereConditions = ["c.id_medico = :medico_id", "c.tipo_cita = 'virtual'"];
+        $params = ['medico_id' => $medicoId];
+
+        if ($buscar) {
+            $whereConditions[] = "(CONCAT(p.nombre, ' ', p.apellido) LIKE :buscar OR p.cedula LIKE :buscar)";
+            $params['buscar'] = "%{$buscar}%";
+        }
+
+        if ($estado !== 'todas') {
+            $whereConditions[] = "c.estado_cita = :estado";
+            $params['estado'] = $estado;
+        }
+
+        if ($fechaDesde) {
+            $whereConditions[] = "c.fecha_cita >= :fecha_desde";
+            $params['fecha_desde'] = $fechaDesde;
+        }
+
+        if ($fechaHasta) {
+            $whereConditions[] = "c.fecha_cita <= :fecha_hasta";
+            $params['fecha_hasta'] = $fechaHasta;
+        }
+
+        $whereClause = implode(' AND ', $whereConditions);
+
+        $sql = "SELECT COUNT(*) FROM citas c
+            INNER JOIN usuarios p ON c.id_paciente = p.id_usuario
+            WHERE {$whereClause}";
+
+        $stmt = $this->conn->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->execute();
+
+        return $stmt->fetchColumn();
+    }
+
+    /**
+     * Obtener historial de consultas virtuales para paciente
+     */
+    public function getHistorialVirtualPaciente($pacienteId, $buscar = '', $estado = 'todas', $fechaDesde = '', $fechaHasta = '', $limit = 15, $offset = 0) {
+        $whereConditions = ["c.id_paciente = :paciente_id", "c.tipo_cita = 'virtual'"];
+        $params = ['paciente_id' => $pacienteId];
+
+        if ($buscar) {
+            $whereConditions[] = "(CONCAT(m.nombre, ' ', m.apellido) LIKE :buscar OR e.nombre_especialidad LIKE :buscar)";
+            $params['buscar'] = "%{$buscar}%";
+        }
+
+        if ($estado !== 'todas') {
+            $whereConditions[] = "c.estado_cita = :estado";
+            $params['estado'] = $estado;
+        }
+
+        if ($fechaDesde) {
+            $whereConditions[] = "c.fecha_cita >= :fecha_desde";
+            $params['fecha_desde'] = $fechaDesde;
+        }
+
+        if ($fechaHasta) {
+            $whereConditions[] = "c.fecha_cita <= :fecha_hasta";
+            $params['fecha_hasta'] = $fechaHasta;
+        }
+
+        $whereClause = implode(' AND ', $whereConditions);
+
+        $sql = "SELECT c.*, 
+                   CONCAT(p.nombre, ' ', p.apellido) as paciente_nombre,
+                   CONCAT(m.nombre, ' ', m.apellido) as medico_nombre,
+                   e.nombre_especialidad
+            FROM citas c
+            INNER JOIN usuarios p ON c.id_paciente = p.id_usuario
+            INNER JOIN usuarios m ON c.id_medico = m.id_usuario
+            INNER JOIN especialidades e ON c.id_especialidad = e.id_especialidad
+            WHERE {$whereClause}
+            ORDER BY c.fecha_cita DESC, c.hora_cita DESC
+            LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->conn->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Contar historial de consultas virtuales para paciente
+     */
+    public function countHistorialVirtualPaciente($pacienteId, $buscar = '', $estado = 'todas', $fechaDesde = '', $fechaHasta = '') {
+        $whereConditions = ["c.id_paciente = :paciente_id", "c.tipo_cita = 'virtual'"];
+        $params = ['paciente_id' => $pacienteId];
+
+        if ($buscar) {
+            $whereConditions[] = "(CONCAT(m.nombre, ' ', m.apellido) LIKE :buscar OR e.nombre_especialidad LIKE :buscar)";
+            $params['buscar'] = "%{$buscar}%";
+        }
+
+        if ($estado !== 'todas') {
+            $whereConditions[] = "c.estado_cita = :estado";
+            $params['estado'] = $estado;
+        }
+
+        if ($fechaDesde) {
+            $whereConditions[] = "c.fecha_cita >= :fecha_desde";
+            $params['fecha_desde'] = $fechaDesde;
+        }
+
+        if ($fechaHasta) {
+            $whereConditions[] = "c.fecha_cita <= :fecha_hasta";
+            $params['fecha_hasta'] = $fechaHasta;
+        }
+
+        $whereClause = implode(' AND ', $whereConditions);
+
+        $sql = "SELECT COUNT(*) FROM citas c
+            INNER JOIN usuarios m ON c.id_medico = m.id_usuario
+            INNER JOIN especialidades e ON c.id_especialidad = e.id_especialidad
+            WHERE {$whereClause}";
+
+        $stmt = $this->conn->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->execute();
+
+        return $stmt->fetchColumn();
+    }
 }
 
 ?>
