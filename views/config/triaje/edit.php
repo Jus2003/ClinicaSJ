@@ -1,8 +1,8 @@
 <?php
 require_once 'models/PreguntaTriaje.php';
 
-// Verificar autenticación y permisos
-if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 1) {
+// Verificar autenticación y permisos (roles 1, 2 o 3)
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role_id'], [1, 2, 3])) {
     header('Location: index.php?action=dashboard');
     exit;
 }

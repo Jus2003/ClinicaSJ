@@ -6,8 +6,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Verificar permisos (solo admin y recepcionistas pueden gestionar horarios)
-if (!in_array($_SESSION['role_id'], [1, 2])) {
+// Verificar permisos (admin y recepcionistas pueden gestionar todos los horarios, médicos solo los suyos)
+if ($_SESSION['role_id'] == 3) {
+    // Médicos solo pueden ver su propio horario
+    $medicoSeleccionado = $_SESSION['user_id'];
+} elseif (!in_array($_SESSION['role_id'], [1, 2])) {
+    // Si no es admin (1), recepcionista (2) o médico (3), redirigir
     header('Location: index.php');
     exit;
 }
@@ -16,20 +20,38 @@ require_once 'config/database.php';
 $database = new Database();
 $db = $database->getConnection();
 
-// Obtener médicos activos con su sucursal
-$sqlMedicos = "SELECT u.id_usuario, u.nombre, u.apellido, u.id_sucursal, s.nombre_sucursal,
-                      GROUP_CONCAT(e.nombre_especialidad SEPARATOR ', ') as especialidades
-               FROM usuarios u 
-               INNER JOIN medico_especialidades me ON u.id_usuario = me.id_medico
-               INNER JOIN especialidades e ON me.id_especialidad = e.id_especialidad
-               LEFT JOIN sucursales s ON u.id_sucursal = s.id_sucursal
-               WHERE u.id_rol = 3 AND u.activo = 1 AND me.activo = 1
-               GROUP BY u.id_usuario
-               ORDER BY u.nombre, u.apellido";
+// Construir la consulta SQL según el rol
+if ($_SESSION['role_id'] == 3) {
+    // Médico solo ve su propia información
+    $sqlMedicos = "SELECT u.id_usuario, u.nombre, u.apellido, u.id_sucursal, s.nombre_sucursal,
+                          GROUP_CONCAT(e.nombre_especialidad SEPARATOR ', ') as especialidades
+                   FROM usuarios u 
+                   INNER JOIN medico_especialidades me ON u.id_usuario = me.id_medico
+                   INNER JOIN especialidades e ON me.id_especialidad = e.id_especialidad
+                   LEFT JOIN sucursales s ON u.id_sucursal = s.id_sucursal
+                   WHERE u.id_usuario = :id_usuario AND u.id_rol = 3 AND u.activo = 1 AND me.activo = 1
+                   GROUP BY u.id_usuario";
 
-$stmtMedicos = $db->prepare($sqlMedicos);
-$stmtMedicos->execute();
-$medicos = $stmtMedicos->fetchAll(PDO::FETCH_ASSOC);
+    $stmtMedicos = $db->prepare($sqlMedicos);
+    $stmtMedicos->bindParam(':id_usuario', $_SESSION['user_id']);
+    $stmtMedicos->execute();
+    $medicos = $stmtMedicos->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    // Admin y recepcionistas ven todos los médicos
+    $sqlMedicos = "SELECT u.id_usuario, u.nombre, u.apellido, u.id_sucursal, s.nombre_sucursal,
+                          GROUP_CONCAT(e.nombre_especialidad SEPARATOR ', ') as especialidades
+                   FROM usuarios u 
+                   INNER JOIN medico_especialidades me ON u.id_usuario = me.id_medico
+                   INNER JOIN especialidades e ON me.id_especialidad = e.id_especialidad
+                   LEFT JOIN sucursales s ON u.id_sucursal = s.id_sucursal
+                   WHERE u.id_rol = 3 AND u.activo = 1 AND me.activo = 1
+                   GROUP BY u.id_usuario
+                   ORDER BY u.nombre, u.apellido";
+
+    $stmtMedicos = $db->prepare($sqlMedicos);
+    $stmtMedicos->execute();
+    $medicos = $stmtMedicos->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Obtener sucursales activas (para el modal)
 $sqlSucursales = "SELECT * FROM sucursales WHERE activo = 1 ORDER BY nombre_sucursal";
@@ -44,7 +66,6 @@ include 'views/includes/header.php';
 include 'views/includes/navbar.php';
 ?>
 
-<!-- Tu contenido aquí, sin cambios -->
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-12">
@@ -55,28 +76,42 @@ include 'views/includes/navbar.php';
                     Disponibilidad de Médicos
                 </h1>
                 <div class="btn-toolbar mb-2 mb-md-0">
-                    <button class="btn btn-success btn-horario" id="btnNuevoHorario" disabled>
+                    <button class="btn btn-success btn-horario" id="btnNuevoHorario" <?php echo ($_SESSION['role_id'] == 3) ? '' : 'disabled'; ?>>
                         <i class="fas fa-plus"></i> Nuevo Horario
                     </button>
                 </div>
             </div>
 
-            <!-- Filtros CORREGIDOS -->
+            <!-- Filtros -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-8">
                             <label class="form-label">Seleccionar Médico</label>
-                            <select class="form-select" id="selectMedico">
-                                <option value="">Seleccione un médico...</option>
-                                <?php foreach ($medicos as $medico): ?>
-                                    <option value="<?php echo $medico['id_usuario']; ?>" 
-                                            data-sucursal="<?php echo $medico['id_sucursal']; ?>"
-                                            data-sucursal-nombre="<?php echo htmlspecialchars($medico['nombre_sucursal']); ?>">
-                                        Dr. <?php echo htmlspecialchars($medico['nombre'] . ' ' . $medico['apellido']); ?>
-                                        (<?php echo htmlspecialchars($medico['especialidades']); ?>)
-                                    </option>
-                                <?php endforeach; ?>
+                            <select class="form-select" id="selectMedico" <?php echo ($_SESSION['role_id'] == 3) ? 'disabled' : ''; ?>>
+                                <?php if ($_SESSION['role_id'] == 3): ?>
+                                    <!-- Si es médico, mostrar solo su opción -->
+                                    <?php foreach ($medicos as $medico): ?>
+                                        <option value="<?php echo $medico['id_usuario']; ?>" 
+                                                data-sucursal="<?php echo $medico['id_sucursal']; ?>"
+                                                data-sucursal-nombre="<?php echo htmlspecialchars($medico['nombre_sucursal']); ?>"
+                                                selected>
+                                            Dr. <?php echo htmlspecialchars($medico['nombre'] . ' ' . $medico['apellido']); ?>
+                                            (<?php echo htmlspecialchars($medico['especialidades']); ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <!-- Si es admin o recepcionista, mostrar todos los médicos -->
+                                    <option value="">Seleccione un médico...</option>
+                                    <?php foreach ($medicos as $medico): ?>
+                                        <option value="<?php echo $medico['id_usuario']; ?>" 
+                                                data-sucursal="<?php echo $medico['id_sucursal']; ?>"
+                                                data-sucursal-nombre="<?php echo htmlspecialchars($medico['nombre_sucursal']); ?>">
+                                            Dr. <?php echo htmlspecialchars($medico['nombre'] . ' ' . $medico['apellido']); ?>
+                                            (<?php echo htmlspecialchars($medico['especialidades']); ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -133,12 +168,13 @@ include 'views/includes/navbar.php';
                                         <!-- Los horarios se cargan dinámicamente aquí -->
                                     </div>
 
-                                    <div class="text-center mt-3">
-                                        <button class="btn btn-outline-primary btn-sm btn-agregar-horario" 
-                                                data-dia="<?php echo $numero; ?>" disabled>
-                                            <i class="fas fa-plus"></i> Agregar Horario
-                                        </button>
-                                    </div>
+                                    <?php if ($_SESSION['role_id'] == 1 || $_SESSION['role_id'] == 2): ?>
+                                        <div class="text-center mt-3">
+                                            <button class="btn btn-outline-primary btn-sm btn-agregar-horario" data-dia="<?php echo $numero; ?>">
+                                                <i class="fas fa-plus"></i> Agregar Horario
+                                            </button>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -147,7 +183,7 @@ include 'views/includes/navbar.php';
             </div>
 
             <!-- Estado cuando no hay médico seleccionado -->
-            <div id="estadoInicial" class="text-center py-5">
+            <div id="estadoInicial" class="text-center py-5" <?php echo ($_SESSION['role_id'] == 3) ? 'style="display: none;"' : ''; ?>>
                 <i class="fas fa-user-clock fa-4x text-muted mb-3"></i>
                 <h4 class="text-muted">Gestión de Horarios Médicos</h4>
                 <p class="text-muted">Seleccione un médico para ver y gestionar sus horarios de disponibilidad</p>
@@ -155,7 +191,8 @@ include 'views/includes/navbar.php';
         </div>
     </div>
 </div>
-<!-- Modal para Agregar/Editar Horario CORREGIDO -->
+
+<!-- Modal para Agregar/Editar Horario -->
 <div class="modal fade" id="modalHorario" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -214,7 +251,6 @@ include 'views/includes/navbar.php';
     </div>
 </div>
 
-<!-- CSS -->
 <style>
     .horario-card {
         transition: all 0.3s ease;
@@ -257,7 +293,6 @@ include 'views/includes/navbar.php';
     }
 </style>
 
-<!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     // Variables globales
@@ -279,6 +314,13 @@ include 'views/includes/navbar.php';
         // Inicializar modal
         modalHorario = new bootstrap.Modal(document.getElementById('modalHorario'));
 
+        // Si es médico, cargar automáticamente sus horarios
+<?php if ($_SESSION['role_id'] == 3): ?>
+            if (document.getElementById('selectMedico').value) {
+                handleMedicoChange.call(document.getElementById('selectMedico'));
+            }
+<?php endif; ?>
+
         // Event listeners
         document.getElementById('selectMedico').addEventListener('change', handleMedicoChange);
         document.getElementById('btnNuevoHorario').addEventListener('click', mostrarModalNuevo);
@@ -293,7 +335,7 @@ include 'views/includes/navbar.php';
         });
     });
 
-    // Manejar cambio de médico CORREGIDO
+    // Manejar cambio de médico
     function handleMedicoChange() {
         const medicoId = this.value;
         const selectedOption = this.options[this.selectedIndex];
@@ -375,7 +417,7 @@ include 'views/includes/navbar.php';
         sucursalSeleccionada = null;
     }
 
-    // Cargar horarios del médico SIMPLIFICADO
+    // Cargar horarios del médico
     function cargarHorariosMedico(medicoId) {
         let url = `views/api/obtener-horarios-medico.php?medico_id=${medicoId}`;
 
@@ -444,14 +486,16 @@ include 'views/includes/navbar.php';
                         ${horario.nombre_sucursal}
                     </small>
                 </div>
-                <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-primary" onclick="editarHorario(${horario.id_horario})" title="Editar">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn btn-outline-danger" onclick="eliminarHorario(${horario.id_horario})" title="Eliminar">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
+<?php if ($_SESSION['role_id'] != 3): // Mostrar solo si NO es médico (rol 3)   ?>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-primary" onclick="editarHorario(${horario.id_horario})" title="Editar">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-outline-danger" onclick="eliminarHorario(${horario.id_horario})" title="Eliminar">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+<?php endif; ?>
             </div>
         `;
         return div;
@@ -509,6 +553,14 @@ include 'views/includes/navbar.php';
                     if (data.success) {
                         const horario = data.horario;
 
+                        // Validar que el médico solo pueda editar sus propios horarios
+<?php if ($_SESSION['role_id'] == 3): ?>
+                            if (horario.id_medico != <?php echo $_SESSION['user_id']; ?>) {
+                                Swal.fire('Error', 'No tiene permisos para editar este horario', 'error');
+                                return;
+                            }
+<?php endif; ?>
+
                         document.getElementById('horarioId').value = horario.id_horario;
                         document.getElementById('medicoId').value = horario.id_medico;
                         document.getElementById('sucursalId').value = horario.id_sucursal;
@@ -548,7 +600,10 @@ include 'views/includes/navbar.php';
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({id_horario: horarioId})
+                    body: JSON.stringify({
+                        id_horario: horarioId,
+                        id_medico: <?php echo ($_SESSION['role_id'] == 3) ? $_SESSION['user_id'] : 'null'; ?>
+                    })
                 })
                         .then(response => response.json())
                         .then(data => {
@@ -571,6 +626,15 @@ include 'views/includes/navbar.php';
     function guardarHorario() {
         const formData = new FormData(document.getElementById('formHorario'));
         const horarioId = document.getElementById('horarioId').value;
+
+        // Validar que el médico solo pueda editar sus propios horarios
+<?php if ($_SESSION['role_id'] == 3): ?>
+            const medicoIdForm = formData.get('id_medico');
+            if (medicoIdForm != <?php echo $_SESSION['user_id']; ?>) {
+                Swal.fire('Error', 'No tiene permisos para editar este horario', 'error');
+                return;
+            }
+<?php endif; ?>
 
         const url = horarioId ? 'views/api/actualizar-horario.php' : 'views/api/crear-horario.php';
 
@@ -597,4 +661,3 @@ include 'views/includes/navbar.php';
 
 </body>
 </html>
-
