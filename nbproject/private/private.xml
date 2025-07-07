@@ -6,16 +6,30 @@
             <file>file:/C:/wamp64/www/sistema_clinica/views/citas/agenda.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/api/agendar-cita.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/controllers/PacientesController.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/citas/gestionar.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/views/citas/agendar.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/citas/disponibilidad.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/triaje/ver.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/api/cambiar-estado-cita.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/citas/pagar.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/descargar_pdf.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/api/consultar-cedula.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/index.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/models/Cita.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/ajax/get_triaje_respuestas.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/views/api/agendar-cita.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/includes/email-sender.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/includes/fpdf/fpdf.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/controllers/CitaController.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/models/TriajeModel.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/includes/pdf_generator.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/citas/gestionar.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/includes/password-generator.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/pacientes/historial.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/citas/disponibilidad.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/triaje_respuestas.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/triaje/gestionar.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/citas/pagar.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/triaje/completar.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/triaje/ver_respuestas.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/includes/tcpdf_config.php</file>
         </group>
     </open-files>
 </project-private>
