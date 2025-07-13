@@ -242,80 +242,171 @@ function generarPlantillaReceta($datosPaciente, $datosMedico, $datosReceta) {
 function generarPDFReceta($datosReceta, $datosPaciente, $datosMedico) {
     // Incluir la funcionalidad del PDF desde el archivo imprimir.php
     require_once __DIR__ . '/fpdf/fpdf.php';
-
-    // Función para convertir texto
-    function convertirTexto($texto) {
-        if (!$texto)
-            return '';
+    
+    // Función para convertir texto (igual que en imprimir.php)
+    function convertirTextoEmail($texto) {
+        if (!$texto) return '';
         return iconv('UTF-8', 'ISO-8859-1//IGNORE', $texto);
     }
-
-    // Clase para el PDF (simplificada)
+    
+    // Usar la MISMA clase que funciona en imprimir.php
     class RecetaPDFEmail extends FPDF {
-
-        private $datos;
-
-        function __construct($datos) {
+        private $receta;
+        
+        function __construct($receta) {
             parent::__construct();
-            $this->datos = $datos;
+            $this->receta = $receta;
         }
-
+        
+        // Encabezado de página (IGUAL que en imprimir.php)
         function Header() {
+            // Logo o nombre de la clínica
             $this->SetFont('Arial', 'B', 20);
             $this->SetTextColor(0, 102, 204);
-            $this->Cell(0, 15, convertirTexto('CLÍNICA MÉDICA INTEGRAL'), 0, 1, 'C');
-
+            $this->Cell(0, 15, convertirTextoEmail('CLÍNICA MÉDICA'), 0, 1, 'C');
+            
             $this->SetFont('Arial', '', 12);
             $this->SetTextColor(100, 100, 100);
-            $this->Cell(0, 6, convertirTexto('Sistema de Gestión Médica'), 0, 1, 'C');
-
+            $this->Cell(0, 8, convertirTextoEmail('Sistema de Gestión Médica'), 0, 1, 'C');
+            $this->Cell(0, 6, convertirTextoEmail('Quito, Ecuador'), 0, 1, 'C');
+            $this->Cell(0, 6, convertirTextoEmail('Teléfono: +593-2-2234567'), 0, 1, 'C');
+            
             $this->Ln(10);
+            
+            // Título de receta
             $this->SetFont('Arial', 'B', 18);
             $this->SetTextColor(0, 0, 0);
-            $this->Cell(0, 12, convertirTexto('RECETA MÉDICA'), 0, 1, 'C');
+            $this->Cell(0, 12, convertirTextoEmail('RECETA MÉDICA'), 0, 1, 'C');
+            
             $this->Ln(5);
         }
-
+        
+        // Pie de página
         function Footer() {
             $this->SetY(-15);
             $this->SetFont('Arial', 'I', 8);
             $this->SetTextColor(128, 128, 128);
-            $this->Cell(0, 10, convertirTexto('Receta médica - Generado el ' . date('d/m/Y H:i')), 0, 0, 'C');
+            $this->Cell(0, 10, convertirTextoEmail('Receta médica - Generado el ' . date('d/m/Y H:i')), 0, 0, 'C');
+        }
+        
+        // Función para agregar información en formato de tabla
+        function addInfoSection($title, $data) {
+            $this->SetFont('Arial', 'B', 12);
+            $this->SetFillColor(240, 248, 255);
+            $this->SetTextColor(0, 102, 204);
+            $this->Cell(0, 8, convertirTextoEmail($title), 1, 1, 'L', true);
+            
+            $this->SetFont('Arial', '', 10);
+            $this->SetTextColor(0, 0, 0);
+            
+            foreach ($data as $label => $value) {
+                if ($value) {
+                    $this->Cell(50, 6, convertirTextoEmail($label . ':'), 0, 0, 'L');
+                    $this->Cell(0, 6, convertirTextoEmail($value), 0, 1, 'L');
+                }
+            }
+            $this->Ln(3);
+        }
+        
+        // Función para texto multilínea
+        function addMultilineText($title, $text) {
+            $this->SetFont('Arial', 'B', 12);
+            $this->SetFillColor(240, 248, 255);
+            $this->SetTextColor(0, 102, 204);
+            $this->Cell(0, 8, convertirTextoEmail($title), 1, 1, 'L', true);
+            
+            $this->SetFont('Arial', '', 10);
+            $this->SetTextColor(0, 0, 0);
+            $this->MultiCell(0, 6, convertirTextoEmail($text), 1, 'L');
+            $this->Ln(3);
         }
     }
-
-    // Crear PDF
-    $pdf = new RecetaPDFEmail(array_merge($datosReceta, $datosPaciente, $datosMedico));
+    
+    // Crear PDF CON TODOS LOS DATOS (igual que imprimir.php)
+    $pdf = new RecetaPDFEmail($datosReceta);
     $pdf->AddPage();
 
-    // Contenido básico del PDF
+    // Información del documento
     $pdf->SetFont('Arial', '', 10);
-    $pdf->Cell(95, 8, convertirTexto('Receta N°: ' . $datosReceta['codigo_receta']), 0, 0, 'L');
-    $pdf->Cell(0, 8, convertirTexto('Fecha: ' . date('d/m/Y')), 0, 1, 'R');
-    $pdf->Ln(5);
+    $pdf->Cell(95, 8, convertirTextoEmail('Receta N°: ' . $datosReceta['codigo_receta']), 0, 0, 'L');
+    $pdf->Cell(0, 8, convertirTextoEmail('Fecha: ' . date('d/m/Y')), 0, 1, 'R');
+    $pdf->Ln(3);
 
-    // Información del paciente
-    $pdf->SetFont('Arial', 'B', 12);
-    $pdf->Cell(0, 8, convertirTexto('INFORMACIÓN DEL PACIENTE'), 1, 1, 'L', true);
-    $pdf->SetFont('Arial', '', 10);
-    $pdf->Cell(50, 6, convertirTexto('Nombre:'), 0, 0, 'L');
-    $pdf->Cell(0, 6, convertirTexto($datosPaciente['nombre']), 0, 1, 'L');
-    $pdf->Ln(5);
+    // Información del Paciente
+    $pdf->addInfoSection('INFORMACIÓN DEL PACIENTE', [
+        'Nombre' => $datosPaciente['nombre'],
+        'Cédula' => $datosPaciente['cedula'],
+        'Email' => $datosPaciente['email']
+    ]);
 
-    // Medicamento
+    // Información del Médico
+    $pdf->addInfoSection('MÉDICO PRESCRIPTOR', [
+        'Nombre' => $datosMedico['nombre'],
+        'Especialidad' => $datosMedico['especialidad']
+    ]);
+
+    // Información del Medicamento (destacada) - IGUAL QUE IMPRIMIR.PHP
     $pdf->SetFont('Arial', 'B', 14);
     $pdf->SetFillColor(255, 248, 220);
-    $pdf->Cell(0, 10, convertirTexto('MEDICAMENTO PRESCRITO'), 1, 1, 'C', true);
+    $pdf->SetTextColor(204, 102, 0);
+    $pdf->Cell(0, 10, convertirTextoEmail('MEDICAMENTO PRESCRITO'), 1, 1, 'C', true);
+
     $pdf->SetFont('Arial', 'B', 16);
-    $pdf->Cell(0, 10, convertirTexto($datosReceta['medicamento']), 0, 1, 'C');
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->Cell(0, 10, convertirTextoEmail($datosReceta['medicamento']), 0, 1, 'C');
 
-    // Información del médico
+    // Detalles del medicamento en tabla
+    $pdf->SetFont('Arial', '', 11);
+    $pdf->SetFillColor(248, 248, 248);
+
+    // Fila 1
+    $pdf->Cell(63, 8, convertirTextoEmail('Concentración'), 1, 0, 'C', true);
+    $pdf->Cell(64, 8, convertirTextoEmail('Forma Farmacéutica'), 1, 0, 'C', true);
+    $pdf->Cell(63, 8, convertirTextoEmail('Cantidad'), 1, 1, 'C', true);
+
+    $pdf->Cell(63, 8, convertirTextoEmail($datosReceta['concentracion'] ?: 'N/E'), 1, 0, 'C');
+    $pdf->Cell(64, 8, convertirTextoEmail($datosReceta['forma_farmaceutica'] ?: 'N/E'), 1, 0, 'C');
+    $pdf->Cell(63, 8, convertirTextoEmail($datosReceta['cantidad'] ?: 'N/E'), 1, 1, 'C');
+
+    // Fila 2
+    $pdf->Cell(63, 8, convertirTextoEmail('Dosis'), 1, 0, 'C', true);
+    $pdf->Cell(64, 8, convertirTextoEmail('Frecuencia'), 1, 0, 'C', true);
+    $pdf->Cell(63, 8, convertirTextoEmail('Duración'), 1, 1, 'C', true);
+
+    $pdf->Cell(63, 8, convertirTextoEmail($datosReceta['dosis'] ?: 'N/E'), 1, 0, 'C');
+    $pdf->Cell(64, 8, convertirTextoEmail($datosReceta['frecuencia'] ?: 'N/E'), 1, 0, 'C');
+    $pdf->Cell(63, 8, convertirTextoEmail($datosReceta['duracion'] ?: 'N/E'), 1, 1, 'C');
+
+    $pdf->Ln(5);
+
+    // Indicaciones especiales
+    if ($datosReceta['indicaciones_especiales']) {
+        $pdf->addMultilineText('INDICACIONES ESPECIALES:', $datosReceta['indicaciones_especiales']);
+    }
+
+    // Información adicional
+    $pdf->SetFont('Arial', 'B', 10);
+    $pdf->SetTextColor(204, 0, 0);
+    $pdf->Cell(0, 6, convertirTextoEmail('INFORMACIÓN IMPORTANTE:'), 0, 1, 'L');
+
+    $pdf->SetFont('Arial', '', 9);
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->Cell(0, 5, convertirTextoEmail('• Esta receta es válida hasta: ' . date('d/m/Y', strtotime('+30 days'))), 0, 1, 'L');
+    $pdf->Cell(0, 5, convertirTextoEmail('• Siga las indicaciones médicas al pie de la letra'), 0, 1, 'L');
+    $pdf->Cell(0, 5, convertirTextoEmail('• En caso de reacciones adversas, suspenda el medicamento y consulte'), 0, 1, 'L');
+
     $pdf->Ln(10);
-    $pdf->SetFont('Arial', '', 10);
-    $pdf->Cell(0, 5, convertirTexto('Dr(a). ' . $datosMedico['nombre']), 0, 1, 'R');
 
+    // Línea de firma
+    $pdf->SetFont('Arial', '', 10);
+    $pdf->Cell(0, 5, convertirTextoEmail('_________________________________'), 0, 1, 'R');
+    $pdf->Cell(0, 5, convertirTextoEmail('Firma y sello del médico'), 0, 1, 'R');
+    $pdf->Cell(0, 5, convertirTextoEmail('Dr(a). ' . $datosMedico['nombre']), 0, 1, 'R');
+    
     // Retornar el PDF como string
     return $pdf->Output('S');
 }
+
+
 
 ?>

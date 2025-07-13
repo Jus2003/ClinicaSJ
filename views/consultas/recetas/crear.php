@@ -206,23 +206,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
 
         $id_receta = $db->lastInsertId();
 
-        // LÍNEA 202: $id_receta = $db->lastInsertId();
-// ========== NUEVO CÓDIGO: ENVÍO AUTOMÁTICO POR EMAIL ==========
         try {
-            // Obtener datos completos de la receta recién creada para el email
             $sqlRecetaCompleta = "SELECT r.*, 
-                                 CONCAT(p.nombre, ' ', p.apellido) as paciente_nombre,
-                                 p.email as paciente_email,
-                                 p.cedula as paciente_cedula,
-                                 CONCAT(m.nombre, ' ', m.apellido) as medico_nombre,
-                                 e.nombre_especialidad
-                          FROM recetas r
-                          INNER JOIN consultas c ON r.id_consulta = c.id_consulta
-                          INNER JOIN citas cit ON c.id_cita = cit.id_cita
-                          INNER JOIN usuarios p ON cit.id_paciente = p.id_usuario
-                          INNER JOIN usuarios m ON cit.id_medico = m.id_usuario
-                          INNER JOIN especialidades e ON cit.id_especialidad = e.id_especialidad
-                          WHERE r.id_receta = :id_receta";
+                             CONCAT(p.nombre, ' ', p.apellido) as paciente_nombre,
+                             p.email as paciente_email,
+                             p.cedula as paciente_cedula,
+                             CONCAT(m.nombre, ' ', m.apellido) as medico_nombre,
+                             e.nombre_especialidad
+                      FROM recetas r
+                      INNER JOIN consultas c ON r.id_consulta = c.id_consulta
+                      INNER JOIN citas cit ON c.id_cita = cit.id_cita
+                      INNER JOIN usuarios p ON cit.id_paciente = p.id_usuario
+                      INNER JOIN usuarios m ON cit.id_medico = m.id_usuario
+                      INNER JOIN especialidades e ON cit.id_especialidad = e.id_especialidad
+                      WHERE r.id_receta = :id_receta";
 
             $stmtRecetaCompleta = $db->prepare($sqlRecetaCompleta);
             $stmtRecetaCompleta->execute(['id_receta' => $id_receta]);
@@ -280,451 +277,452 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         $db->rollBack();
         $error = $e->getMessage();
     }
+}
 
 // Función para calcular edad
-    function calcularEdad($fechaNacimiento) {
-        if (!$fechaNacimiento)
-            return 'N/A';
-        $nacimiento = new DateTime($fechaNacimiento);
-        $hoy = new DateTime();
-        return $nacimiento->diff($hoy)->y . ' años';
-    }
+function calcularEdad($fechaNacimiento) {
+    if (!$fechaNacimiento)
+        return 'N/A';
+    $nacimiento = new DateTime($fechaNacimiento);
+    $hoy = new DateTime();
+    return $nacimiento->diff($hoy)->y . ' años';
+}
 
-    include 'views/includes/header.php';
-    include 'views/includes/navbar.php';
-    ?>
+include 'views/includes/header.php';
+include 'views/includes/navbar.php';
+?>
 
-    <div class="container-fluid mt-4">
-        <div class="row">
-            <div class="col-12">
-                <!-- Header -->
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-prescription text-primary"></i> 
-                        Nueva Receta Médica
-                    </h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <div class="btn-group me-2">
-                            <a href="javascript:history.back()" class="btn btn-outline-secondary">
-                                <i class="fas fa-arrow-left"></i> Volver
-                            </a>
-                        </div>
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">
+                    <i class="fas fa-prescription text-primary"></i> 
+                    Nueva Receta Médica
+                </h1>
+                <div class="btn-toolbar mb-2 mb-md-0">
+                    <div class="btn-group me-2">
+                        <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Volver
+                        </a>
                     </div>
                 </div>
+            </div>
 
-                <!-- Mensajes -->
-                <?php if ($error): ?>
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="fas fa-exclamation-circle me-2"></i><?php echo htmlspecialchars($error); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <!-- Mensajes -->
+            <?php if ($error): ?>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i><?php echo htmlspecialchars($error); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+
+            <div class="row">
+                <!-- Información del Paciente -->
+                <?php if ($consultaInfo): ?>
+                    <div class="col-lg-4 mb-4">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-user me-2"></i>
+                                    Información del Paciente
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="text-center mb-3">
+                                    <div class="avatar bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center" 
+                                         style="width: 60px; height: 60px; font-size: 24px;">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                </div>
+
+                                <div class="text-center mb-3">
+                                    <h6 class="mb-1"><?php echo htmlspecialchars($consultaInfo['paciente_nombre']); ?></h6>
+                                    <small class="text-muted">Cédula: <?php echo htmlspecialchars($consultaInfo['paciente_cedula']); ?></small>
+                                </div>
+
+                                <div class="info-item mb-2">
+                                    <strong><i class="fas fa-birthday-cake text-muted me-2"></i>Edad:</strong>
+                                    <span><?php echo calcularEdad($consultaInfo['fecha_nacimiento']); ?></span>
+                                </div>
+
+                                <div class="info-item mb-2">
+                                    <strong><i class="fas fa-calendar text-muted me-2"></i>Fecha Consulta:</strong>
+                                    <span><?php echo date('d/m/Y', strtotime($consultaInfo['fecha_cita'])); ?></span>
+                                </div>
+
+                                <div class="info-item mb-2">
+                                    <strong><i class="fas fa-user-md text-muted me-2"></i>Médico:</strong>
+                                    <span><?php echo htmlspecialchars($consultaInfo['medico_nombre']); ?></span>
+                                </div>
+
+                                <div class="info-item">
+                                    <strong><i class="fas fa-building text-muted me-2"></i>Sucursal:</strong>
+                                    <span><?php echo htmlspecialchars($consultaInfo['nombre_sucursal']); ?></span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 <?php endif; ?>
 
-                <div class="row">
-                    <!-- Información del Paciente -->
-                    <?php if ($consultaInfo): ?>
-                        <div class="col-lg-4 mb-4">
-                            <div class="card border-0 shadow-sm">
-                                <div class="card-header bg-info text-white">
-                                    <h6 class="mb-0">
-                                        <i class="fas fa-user me-2"></i>
-                                        Información del Paciente
-                                    </h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="text-center mb-3">
-                                        <div class="avatar bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center" 
-                                             style="width: 60px; height: 60px; font-size: 24px;">
-                                            <i class="fas fa-user"></i>
-                                        </div>
-                                    </div>
-
-                                    <div class="text-center mb-3">
-                                        <h6 class="mb-1"><?php echo htmlspecialchars($consultaInfo['paciente_nombre']); ?></h6>
-                                        <small class="text-muted">Cédula: <?php echo htmlspecialchars($consultaInfo['paciente_cedula']); ?></small>
-                                    </div>
-
-                                    <div class="info-item mb-2">
-                                        <strong><i class="fas fa-birthday-cake text-muted me-2"></i>Edad:</strong>
-                                        <span><?php echo calcularEdad($consultaInfo['fecha_nacimiento']); ?></span>
-                                    </div>
-
-                                    <div class="info-item mb-2">
-                                        <strong><i class="fas fa-calendar text-muted me-2"></i>Fecha Consulta:</strong>
-                                        <span><?php echo date('d/m/Y', strtotime($consultaInfo['fecha_cita'])); ?></span>
-                                    </div>
-
-                                    <div class="info-item mb-2">
-                                        <strong><i class="fas fa-user-md text-muted me-2"></i>Médico:</strong>
-                                        <span><?php echo htmlspecialchars($consultaInfo['medico_nombre']); ?></span>
-                                    </div>
-
-                                    <div class="info-item">
-                                        <strong><i class="fas fa-building text-muted me-2"></i>Sucursal:</strong>
-                                        <span><?php echo htmlspecialchars($consultaInfo['nombre_sucursal']); ?></span>
-                                    </div>
-                                </div>
-                            </div>
+                <!-- Formulario de Receta -->
+                <div class="<?php echo $consultaInfo ? 'col-lg-8' : 'col-12'; ?>">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-pills me-2"></i>
+                                Datos de la Receta
+                            </h5>
                         </div>
-                    <?php endif; ?>
+                        <div class="card-body">
+                            <form method="POST" id="formReceta">
+                                <?php if ($consultaInfo && isset($consultaInfo['id_consulta'])): ?>
+                                    <input type="hidden" name="id_consulta" value="<?php echo $consultaInfo['id_consulta']; ?>">
+                                <?php endif; ?>
 
-                    <!-- Formulario de Receta -->
-                    <div class="<?php echo $consultaInfo ? 'col-lg-8' : 'col-12'; ?>">
-                        <div class="card border-0 shadow-sm">
-                            <div class="card-header bg-primary text-white">
-                                <h5 class="mb-0">
-                                    <i class="fas fa-pills me-2"></i>
-                                    Datos de la Receta
-                                </h5>
-                            </div>
-                            <div class="card-body">
-                                <form method="POST" id="formReceta">
-                                    <?php if ($consultaInfo && isset($consultaInfo['id_consulta'])): ?>
-                                        <input type="hidden" name="id_consulta" value="<?php echo $consultaInfo['id_consulta']; ?>">
-                                    <?php endif; ?>
+                                <!-- Selector de Consulta (solo si no viene de consulta específica) -->
+                                <?php if (!$consultaInfo): ?>
+                                    <div class="row mb-4">
+                                        <div class="col-12">
+                                            <h6 class="text-primary border-bottom pb-2 mb-3">
+                                                <i class="fas fa-search me-2"></i>Seleccionar Consulta
+                                            </h6>
 
-                                    <!-- Selector de Consulta (solo si no viene de consulta específica) -->
-                                    <?php if (!$consultaInfo): ?>
-                                        <div class="row mb-4">
-                                            <div class="col-12">
-                                                <h6 class="text-primary border-bottom pb-2 mb-3">
-                                                    <i class="fas fa-search me-2"></i>Seleccionar Consulta
-                                                </h6>
-
-                                                <?php if (!empty($consultasDisponibles)): ?>
-                                                    <div class="mb-3">
-                                                        <label for="seleccionar_consulta" class="form-label">
-                                                            Consulta Médica <span class="text-danger">*</span>
-                                                        </label>
-                                                        <select class="form-select" id="seleccionar_consulta" name="id_consulta" required onchange="mostrarDetallesConsulta(this.value)">
-                                                            <option value="">Seleccionar consulta para crear receta...</option>
-                                                            <?php foreach ($consultasDisponibles as $consulta): ?>
-                                                                <option value="<?php echo $consulta['id_consulta']; ?>" 
-                                                                        data-paciente="<?php echo htmlspecialchars($consulta['paciente_nombre']); ?>"
-                                                                        data-cedula="<?php echo htmlspecialchars($consulta['paciente_cedula']); ?>"
-                                                                        data-telefono="<?php echo htmlspecialchars($consulta['paciente_telefono'] ?? ''); ?>"
-                                                                        data-fecha="<?php echo date('d/m/Y', strtotime($consulta['fecha_cita'])); ?>"
-                                                                        data-hora="<?php echo date('H:i', strtotime($consulta['hora_cita'])); ?>"
-                                                                        data-motivo="<?php echo htmlspecialchars($consulta['motivo_consulta'] ?? ''); ?>"
-                                                                        data-diagnostico="<?php echo htmlspecialchars($consulta['diagnostico_principal'] ?? ''); ?>"
-                                                                        data-especialidad="<?php echo htmlspecialchars($consulta['nombre_especialidad']); ?>"
-                                                                        data-sucursal="<?php echo htmlspecialchars($consulta['nombre_sucursal']); ?>"
-                                                                        data-recetas="<?php echo $consulta['total_recetas']; ?>"
-                                                                        <?php if ($_SESSION['role_id'] == 1): ?>
-                                                                            data-medico="<?php echo htmlspecialchars($consulta['medico_nombre']); ?>"
-                                                                        <?php endif; ?>>
-
-                                                                    <?php echo htmlspecialchars($consulta['paciente_nombre']); ?> - 
-                                                                    <?php echo htmlspecialchars($consulta['paciente_cedula']); ?> - 
-                                                                    <?php echo date('d/m/Y H:i', strtotime($consulta['fecha_cita'] . ' ' . $consulta['hora_cita'])); ?>
-
+                                            <?php if (!empty($consultasDisponibles)): ?>
+                                                <div class="mb-3">
+                                                    <label for="seleccionar_consulta" class="form-label">
+                                                        Consulta Médica <span class="text-danger">*</span>
+                                                    </label>
+                                                    <select class="form-select" id="seleccionar_consulta" name="id_consulta" required onchange="mostrarDetallesConsulta(this.value)">
+                                                        <option value="">Seleccionar consulta para crear receta...</option>
+                                                        <?php foreach ($consultasDisponibles as $consulta): ?>
+                                                            <option value="<?php echo $consulta['id_consulta']; ?>" 
+                                                                    data-paciente="<?php echo htmlspecialchars($consulta['paciente_nombre']); ?>"
+                                                                    data-cedula="<?php echo htmlspecialchars($consulta['paciente_cedula']); ?>"
+                                                                    data-telefono="<?php echo htmlspecialchars($consulta['paciente_telefono'] ?? ''); ?>"
+                                                                    data-fecha="<?php echo date('d/m/Y', strtotime($consulta['fecha_cita'])); ?>"
+                                                                    data-hora="<?php echo date('H:i', strtotime($consulta['hora_cita'])); ?>"
+                                                                    data-motivo="<?php echo htmlspecialchars($consulta['motivo_consulta'] ?? ''); ?>"
+                                                                    data-diagnostico="<?php echo htmlspecialchars($consulta['diagnostico_principal'] ?? ''); ?>"
+                                                                    data-especialidad="<?php echo htmlspecialchars($consulta['nombre_especialidad']); ?>"
+                                                                    data-sucursal="<?php echo htmlspecialchars($consulta['nombre_sucursal']); ?>"
+                                                                    data-recetas="<?php echo $consulta['total_recetas']; ?>"
                                                                     <?php if ($_SESSION['role_id'] == 1): ?>
-                                                                        (Dr. <?php echo htmlspecialchars($consulta['medico_nombre']); ?>)
-                                                                    <?php endif; ?>
+                                                                        data-medico="<?php echo htmlspecialchars($consulta['medico_nombre']); ?>"
+                                                                    <?php endif; ?>>
 
-                                                                    <?php if ($consulta['total_recetas'] > 0): ?>
-                                                                        [<?php echo $consulta['total_recetas']; ?> receta(s) existente(s)]
-                                                                    <?php endif; ?>
-                                                                </option>
-                                                            <?php endforeach; ?>
-                                                        </select>
-                                                        <div class="form-text">Seleccione la consulta médica para la cual desea crear esta receta</div>
+                                                                <?php echo htmlspecialchars($consulta['paciente_nombre']); ?> - 
+                                                                <?php echo htmlspecialchars($consulta['paciente_cedula']); ?> - 
+                                                                <?php echo date('d/m/Y H:i', strtotime($consulta['fecha_cita'] . ' ' . $consulta['hora_cita'])); ?>
+
+                                                                <?php if ($_SESSION['role_id'] == 1): ?>
+                                                                    (Dr. <?php echo htmlspecialchars($consulta['medico_nombre']); ?>)
+                                                                <?php endif; ?>
+
+                                                                <?php if ($consulta['total_recetas'] > 0): ?>
+                                                                    [<?php echo $consulta['total_recetas']; ?> receta(s) existente(s)]
+                                                                <?php endif; ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <div class="form-text">Seleccione la consulta médica para la cual desea crear esta receta</div>
+                                                </div>
+
+                                                <!-- Panel de detalles de la consulta seleccionada -->
+                                                <div id="detallesConsulta" class="card border-info d-none">
+                                                    <div class="card-header bg-info text-white">
+                                                        <h6 class="mb-0">
+                                                            <i class="fas fa-info-circle me-2"></i>
+                                                            Detalles de la Consulta Seleccionada
+                                                        </h6>
                                                     </div>
-
-                                                    <!-- Panel de detalles de la consulta seleccionada -->
-                                                    <div id="detallesConsulta" class="card border-info d-none">
-                                                        <div class="card-header bg-info text-white">
-                                                            <h6 class="mb-0">
-                                                                <i class="fas fa-info-circle me-2"></i>
-                                                                Detalles de la Consulta Seleccionada
-                                                            </h6>
-                                                        </div>
-                                                        <div class="card-body">
-                                                            <div class="row">
-                                                                <div class="col-md-6">
-                                                                    <div class="mb-2">
-                                                                        <strong><i class="fas fa-user text-muted me-2"></i>Paciente:</strong>
-                                                                        <span id="detalle-paciente"></span>
-                                                                    </div>
-                                                                    <div class="mb-2">
-                                                                        <strong><i class="fas fa-id-card text-muted me-2"></i>Cédula:</strong>
-                                                                        <span id="detalle-cedula"></span>
-                                                                    </div>
-                                                                    <div class="mb-2">
-                                                                        <strong><i class="fas fa-phone text-muted me-2"></i>Teléfono:</strong>
-                                                                        <span id="detalle-telefono"></span>
-                                                                    </div>
-                                                                    <?php if ($_SESSION['role_id'] == 1): ?>
-                                                                        <div class="mb-2">
-                                                                            <strong><i class="fas fa-user-md text-muted me-2"></i>Médico:</strong>
-                                                                            <span id="detalle-medico"></span>
-                                                                        </div>
-                                                                    <?php endif; ?>
+                                                    <div class="card-body">
+                                                        <div class="row">
+                                                            <div class="col-md-6">
+                                                                <div class="mb-2">
+                                                                    <strong><i class="fas fa-user text-muted me-2"></i>Paciente:</strong>
+                                                                    <span id="detalle-paciente"></span>
                                                                 </div>
-                                                                <div class="col-md-6">
-                                                                    <div class="mb-2">
-                                                                        <strong><i class="fas fa-calendar text-muted me-2"></i>Fecha y Hora:</strong>
-                                                                        <span id="detalle-fecha"></span> a las <span id="detalle-hora"></span>
-                                                                    </div>
-                                                                    <div class="mb-2">
-                                                                        <strong><i class="fas fa-stethoscope text-muted me-2"></i>Especialidad:</strong>
-                                                                        <span id="detalle-especialidad"></span>
-                                                                    </div>
-                                                                    <div class="mb-2">
-                                                                        <strong><i class="fas fa-building text-muted me-2"></i>Sucursal:</strong>
-                                                                        <span id="detalle-sucursal"></span>
-                                                                    </div>
-                                                                    <div class="mb-2">
-                                                                        <strong><i class="fas fa-prescription text-muted me-2"></i>Recetas existentes:</strong>
-                                                                        <span id="detalle-recetas" class="badge bg-secondary"></span>
-                                                                    </div>
+                                                                <div class="mb-2">
+                                                                    <strong><i class="fas fa-id-card text-muted me-2"></i>Cédula:</strong>
+                                                                    <span id="detalle-cedula"></span>
                                                                 </div>
+                                                                <div class="mb-2">
+                                                                    <strong><i class="fas fa-phone text-muted me-2"></i>Teléfono:</strong>
+                                                                    <span id="detalle-telefono"></span>
+                                                                </div>
+                                                                <?php if ($_SESSION['role_id'] == 1): ?>
+                                                                    <div class="mb-2">
+                                                                        <strong><i class="fas fa-user-md text-muted me-2"></i>Médico:</strong>
+                                                                        <span id="detalle-medico"></span>
+                                                                    </div>
+                                                                <?php endif; ?>
                                                             </div>
-
-                                                            <div class="row mt-2">
-                                                                <div class="col-12">
-                                                                    <div class="mb-2" id="detalle-motivo-container">
-                                                                        <strong><i class="fas fa-comment text-muted me-2"></i>Motivo de Consulta:</strong>
-                                                                        <div class="mt-1 p-2 bg-light rounded">
-                                                                            <span id="detalle-motivo"></span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="mb-2" id="detalle-diagnostico-container">
-                                                                        <strong><i class="fas fa-diagnosis text-muted me-2"></i>Diagnóstico:</strong>
-                                                                        <div class="mt-1 p-2 bg-light rounded">
-                                                                            <span id="detalle-diagnostico"></span>
-                                                                        </div>
-                                                                    </div>
+                                                            <div class="col-md-6">
+                                                                <div class="mb-2">
+                                                                    <strong><i class="fas fa-calendar text-muted me-2"></i>Fecha y Hora:</strong>
+                                                                    <span id="detalle-fecha"></span> a las <span id="detalle-hora"></span>
+                                                                </div>
+                                                                <div class="mb-2">
+                                                                    <strong><i class="fas fa-stethoscope text-muted me-2"></i>Especialidad:</strong>
+                                                                    <span id="detalle-especialidad"></span>
+                                                                </div>
+                                                                <div class="mb-2">
+                                                                    <strong><i class="fas fa-building text-muted me-2"></i>Sucursal:</strong>
+                                                                    <span id="detalle-sucursal"></span>
+                                                                </div>
+                                                                <div class="mb-2">
+                                                                    <strong><i class="fas fa-prescription text-muted me-2"></i>Recetas existentes:</strong>
+                                                                    <span id="detalle-recetas" class="badge bg-secondary"></span>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </div>
 
-                                                <?php else: ?>
-                                                    <div class="alert alert-warning border-0">
-                                                        <div class="d-flex align-items-center">
-                                                            <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
-                                                            <div>
-                                                                <h6 class="alert-heading mb-1">No hay consultas disponibles</h6>
-                                                                <p class="mb-0">
-                                                                    <?php if ($_SESSION['role_id'] == 3): ?>
-                                                                        No tienes consultas médicas completadas donde puedas crear recetas.
-                                                                        <a href="index.php?action=consultas/atender" class="alert-link">Ir a Atender Pacientes</a>
-                                                                    <?php else: ?>
-                                                                        No hay consultas médicas completadas en el sistema.
-                                                                        <a href="index.php?action=citas/gestionar" class="alert-link">Gestionar Citas</a>
-                                                                    <?php endif; ?>
-                                                                </p>
+                                                        <div class="row mt-2">
+                                                            <div class="col-12">
+                                                                <div class="mb-2" id="detalle-motivo-container">
+                                                                    <strong><i class="fas fa-comment text-muted me-2"></i>Motivo de Consulta:</strong>
+                                                                    <div class="mt-1 p-2 bg-light rounded">
+                                                                        <span id="detalle-motivo"></span>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="mb-2" id="detalle-diagnostico-container">
+                                                                    <strong><i class="fas fa-diagnosis text-muted me-2"></i>Diagnóstico:</strong>
+                                                                    <div class="mt-1 p-2 bg-light rounded">
+                                                                        <span id="detalle-diagnostico"></span>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <!-- Información del Medicamento -->
-                                    <div class="row mb-4">
-                                        <div class="col-12">
-                                            <h6 class="text-primary border-bottom pb-2 mb-3">
-                                                <i class="fas fa-pills me-2"></i>Información del Medicamento
-                                            </h6>
-                                        </div>
-
-                                        <div class="col-md-6 mb-3">
-                                            <label for="medicamento" class="form-label">
-                                                Medicamento <span class="text-danger">*</span>
-                                            </label>
-                                            <input type="text" class="form-control" id="medicamento" name="medicamento" 
-                                                   placeholder="Nombre del medicamento" required>
-                                            <div class="form-text">Nombre genérico o comercial del medicamento</div>
-                                        </div>
-
-                                        <div class="col-md-3 mb-3">
-                                            <label for="concentracion" class="form-label">Concentración</label>
-                                            <input type="text" class="form-control" id="concentracion" name="concentracion" 
-                                                   placeholder="ej: 500mg, 10ml">
-                                            <div class="form-text">Concentración por unidad</div>
-                                        </div>
-
-                                        <div class="col-md-3 mb-3">
-                                            <label for="forma_farmaceutica" class="form-label">Forma Farmacéutica</label>
-                                            <select class="form-select" id="forma_farmaceutica" name="forma_farmaceutica">
-                                                <option value="">Seleccionar...</option>
-                                                <option value="Tabletas">Tabletas</option>
-                                                <option value="Cápsulas">Cápsulas</option>
-                                                <option value="Jarabe">Jarabe</option>
-                                                <option value="Suspensión">Suspensión</option>
-                                                <option value="Gotas">Gotas</option>
-                                                <option value="Crema">Crema</option>
-                                                <option value="Pomada">Pomada</option>
-                                                <option value="Gel">Gel</option>
-                                                <option value="Solución">Solución</option>
-                                                <option value="Inyectable">Inyectable</option>
-                                                <option value="Supositorios">Supositorios</option>
-                                                <option value="Óvulos">Óvulos</option>
-                                                <option value="Parches">Parches</option>
-                                                <option value="Inhalador">Inhalador</option>
-                                                <option value="Otra">Otra</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <!-- Posología -->
-                                    <div class="row mb-4">
-                                        <div class="col-12">
-                                            <h6 class="text-primary border-bottom pb-2 mb-3">
-                                                <i class="fas fa-clock me-2"></i>Posología
-                                            </h6>
-                                        </div>
-
-                                        <div class="col-md-3 mb-3">
-                                            <label for="dosis" class="form-label">
-                                                Dosis <span class="text-danger">*</span>
-                                            </label>
-                                            <input type="text" class="form-control" id="dosis" name="dosis" 
-                                                   placeholder="ej: 1 tableta, 5ml" required>
-                                            <div class="form-text">Cantidad por toma</div>
-                                        </div>
-
-                                        <div class="col-md-3 mb-3">
-                                            <label for="frecuencia" class="form-label">
-                                                Frecuencia <span class="text-danger">*</span>
-                                            </label>
-                                            <select class="form-select" id="frecuencia" name="frecuencia" required>
-                                                <option value="">Seleccionar...</option>
-                                                <option value="Cada 4 horas">Cada 4 horas</option>
-                                                <option value="Cada 6 horas">Cada 6 horas</option>
-                                                <option value="Cada 8 horas">Cada 8 horas</option>
-                                                <option value="Cada 12 horas">Cada 12 horas</option>
-                                                <option value="Cada 24 horas">Cada 24 horas (Diario)</option>
-                                                <option value="2 veces al día">2 veces al día</option>
-                                                <option value="3 veces al día">3 veces al día</option>
-                                                <option value="Antes de comidas">Antes de comidas</option>
-                                                <option value="Después de comidas">Después de comidas</option>
-                                                <option value="Con comidas">Con comidas</option>
-                                                <option value="Antes de dormir">Antes de dormir</option>
-                                                <option value="En ayunas">En ayunas</option>
-                                                <option value="Según necesidad">Según necesidad</option>
-                                            </select>
-                                        </div>
-
-                                        <div class="col-md-3 mb-3">
-                                            <label for="duracion" class="form-label">
-                                                Duración <span class="text-danger">*</span>
-                                            </label>
-                                            <input type="text" class="form-control" id="duracion" name="duracion" 
-                                                   placeholder="ej: 7 días, 2 semanas" required>
-                                            <div class="form-text">Duración del tratamiento</div>
-                                        </div>
-
-                                        <div class="col-md-3 mb-3">
-                                            <label for="cantidad" class="form-label">
-                                                Cantidad <span class="text-danger">*</span>
-                                            </label>
-                                            <input type="text" class="form-control" id="cantidad" name="cantidad" 
-                                                   placeholder="ej: 30 tabletas, 1 frasco" required>
-                                            <div class="form-text">Cantidad total a dispensar</div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Indicaciones Especiales -->
-                                    <div class="row mb-4">
-                                        <div class="col-12">
-                                            <h6 class="text-primary border-bottom pb-2 mb-3">
-                                                <i class="fas fa-exclamation-triangle me-2"></i>Indicaciones Especiales
-                                            </h6>
-
-                                            <div class="mb-3">
-                                                <label for="indicaciones_especiales" class="form-label">Instrucciones Adicionales</label>
-                                                <textarea class="form-control" id="indicaciones_especiales" name="indicaciones_especiales" 
-                                                          rows="4" placeholder="Instrucciones especiales para el paciente..."></textarea>
-                                                <div class="form-text">Indicaciones especiales, precauciones, efectos secundarios a vigilar, etc.</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Plantillas rápidas -->
-                                    <div class="row mb-4">
-                                        <div class="col-12">
-                                            <h6 class="text-secondary border-bottom pb-2 mb-3">
-                                                <i class="fas fa-magic me-2"></i>Plantillas Rápidas
-                                            </h6>
-
-                                            <div class="row">
-                                                <div class="col-md-4 mb-2">
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" 
-                                                            onclick="aplicarPlantilla('paracetamol')">
-                                                        <i class="fas fa-thermometer-half me-1"></i>Paracetamol
-                                                    </button>
                                                 </div>
-                                                <div class="col-md-4 mb-2">
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" 
-                                                            onclick="aplicarPlantilla('ibuprofeno')">
-                                                        <i class="fas fa-hand-holding-medical me-1"></i>Ibuprofeno
-                                                    </button>
+
+                                            <?php else: ?>
+                                                <div class="alert alert-warning border-0">
+                                                    <div class="d-flex align-items-center">
+                                                        <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                                                        <div>
+                                                            <h6 class="alert-heading mb-1">No hay consultas disponibles</h6>
+                                                            <p class="mb-0">
+                                                                <?php if ($_SESSION['role_id'] == 3): ?>
+                                                                    No tienes consultas médicas completadas donde puedas crear recetas.
+                                                                    <a href="index.php?action=consultas/atender" class="alert-link">Ir a Atender Pacientes</a>
+                                                                <?php else: ?>
+                                                                    No hay consultas médicas completadas en el sistema.
+                                                                    <a href="index.php?action=citas/gestionar" class="alert-link">Gestionar Citas</a>
+                                                                <?php endif; ?>
+                                                            </p>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div class="col-md-4 mb-2">
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" 
-                                                            onclick="aplicarPlantilla('amoxicilina')">
-                                                        <i class="fas fa-capsules me-1"></i>Amoxicilina
-                                                    </button>
-                                                </div>
-                                            </div>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
+                                <?php endif; ?>
 
-                                    <!-- Botones de acción -->
-                                    <div class="row">
-                                        <div class="col-12">
-                                            <div class="d-flex justify-content-end gap-2">
-                                                <a href="javascript:history.back()" class="btn btn-outline-secondary">
-                                                    <i class="fas fa-times"></i> Cancelar
-                                                </a>
-                                                <button type="submit" class="btn btn-primary">
-                                                    <i class="fas fa-save"></i> Crear Receta
+                                <!-- Información del Medicamento -->
+                                <div class="row mb-4">
+                                    <div class="col-12">
+                                        <h6 class="text-primary border-bottom pb-2 mb-3">
+                                            <i class="fas fa-pills me-2"></i>Información del Medicamento
+                                        </h6>
+                                    </div>
+
+                                    <div class="col-md-6 mb-3">
+                                        <label for="medicamento" class="form-label">
+                                            Medicamento <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="medicamento" name="medicamento" 
+                                               placeholder="Nombre del medicamento" required>
+                                        <div class="form-text">Nombre genérico o comercial del medicamento</div>
+                                    </div>
+
+                                    <div class="col-md-3 mb-3">
+                                        <label for="concentracion" class="form-label">Concentración</label>
+                                        <input type="text" class="form-control" id="concentracion" name="concentracion" 
+                                               placeholder="ej: 500mg, 10ml">
+                                        <div class="form-text">Concentración por unidad</div>
+                                    </div>
+
+                                    <div class="col-md-3 mb-3">
+                                        <label for="forma_farmaceutica" class="form-label">Forma Farmacéutica</label>
+                                        <select class="form-select" id="forma_farmaceutica" name="forma_farmaceutica">
+                                            <option value="">Seleccionar...</option>
+                                            <option value="Tabletas">Tabletas</option>
+                                            <option value="Cápsulas">Cápsulas</option>
+                                            <option value="Jarabe">Jarabe</option>
+                                            <option value="Suspensión">Suspensión</option>
+                                            <option value="Gotas">Gotas</option>
+                                            <option value="Crema">Crema</option>
+                                            <option value="Pomada">Pomada</option>
+                                            <option value="Gel">Gel</option>
+                                            <option value="Solución">Solución</option>
+                                            <option value="Inyectable">Inyectable</option>
+                                            <option value="Supositorios">Supositorios</option>
+                                            <option value="Óvulos">Óvulos</option>
+                                            <option value="Parches">Parches</option>
+                                            <option value="Inhalador">Inhalador</option>
+                                            <option value="Otra">Otra</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Posología -->
+                                <div class="row mb-4">
+                                    <div class="col-12">
+                                        <h6 class="text-primary border-bottom pb-2 mb-3">
+                                            <i class="fas fa-clock me-2"></i>Posología
+                                        </h6>
+                                    </div>
+
+                                    <div class="col-md-3 mb-3">
+                                        <label for="dosis" class="form-label">
+                                            Dosis <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="dosis" name="dosis" 
+                                               placeholder="ej: 1 tableta, 5ml" required>
+                                        <div class="form-text">Cantidad por toma</div>
+                                    </div>
+
+                                    <div class="col-md-3 mb-3">
+                                        <label for="frecuencia" class="form-label">
+                                            Frecuencia <span class="text-danger">*</span>
+                                        </label>
+                                        <select class="form-select" id="frecuencia" name="frecuencia" required>
+                                            <option value="">Seleccionar...</option>
+                                            <option value="Cada 4 horas">Cada 4 horas</option>
+                                            <option value="Cada 6 horas">Cada 6 horas</option>
+                                            <option value="Cada 8 horas">Cada 8 horas</option>
+                                            <option value="Cada 12 horas">Cada 12 horas</option>
+                                            <option value="Cada 24 horas">Cada 24 horas (Diario)</option>
+                                            <option value="2 veces al día">2 veces al día</option>
+                                            <option value="3 veces al día">3 veces al día</option>
+                                            <option value="Antes de comidas">Antes de comidas</option>
+                                            <option value="Después de comidas">Después de comidas</option>
+                                            <option value="Con comidas">Con comidas</option>
+                                            <option value="Antes de dormir">Antes de dormir</option>
+                                            <option value="En ayunas">En ayunas</option>
+                                            <option value="Según necesidad">Según necesidad</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-3 mb-3">
+                                        <label for="duracion" class="form-label">
+                                            Duración <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="duracion" name="duracion" 
+                                               placeholder="ej: 7 días, 2 semanas" required>
+                                        <div class="form-text">Duración del tratamiento</div>
+                                    </div>
+
+                                    <div class="col-md-3 mb-3">
+                                        <label for="cantidad" class="form-label">
+                                            Cantidad <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="cantidad" name="cantidad" 
+                                               placeholder="ej: 30 tabletas, 1 frasco" required>
+                                        <div class="form-text">Cantidad total a dispensar</div>
+                                    </div>
+                                </div>
+
+                                <!-- Indicaciones Especiales -->
+                                <div class="row mb-4">
+                                    <div class="col-12">
+                                        <h6 class="text-primary border-bottom pb-2 mb-3">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>Indicaciones Especiales
+                                        </h6>
+
+                                        <div class="mb-3">
+                                            <label for="indicaciones_especiales" class="form-label">Instrucciones Adicionales</label>
+                                            <textarea class="form-control" id="indicaciones_especiales" name="indicaciones_especiales" 
+                                                      rows="4" placeholder="Instrucciones especiales para el paciente..."></textarea>
+                                            <div class="form-text">Indicaciones especiales, precauciones, efectos secundarios a vigilar, etc.</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Plantillas rápidas -->
+                                <div class="row mb-4">
+                                    <div class="col-12">
+                                        <h6 class="text-secondary border-bottom pb-2 mb-3">
+                                            <i class="fas fa-magic me-2"></i>Plantillas Rápidas
+                                        </h6>
+
+                                        <div class="row">
+                                            <div class="col-md-4 mb-2">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm w-100" 
+                                                        onclick="aplicarPlantilla('paracetamol')">
+                                                    <i class="fas fa-thermometer-half me-1"></i>Paracetamol
+                                                </button>
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm w-100" 
+                                                        onclick="aplicarPlantilla('ibuprofeno')">
+                                                    <i class="fas fa-hand-holding-medical me-1"></i>Ibuprofeno
+                                                </button>
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm w-100" 
+                                                        onclick="aplicarPlantilla('amoxicilina')">
+                                                    <i class="fas fa-capsules me-1"></i>Amoxicilina
                                                 </button>
                                             </div>
                                         </div>
                                     </div>
-                                </form>
-                            </div>
+                                </div>
+
+                                <!-- Botones de acción -->
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                                                <i class="fas fa-times"></i> Cancelar
+                                            </a>
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-save"></i> Crear Receta
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
+<script>
     // Función para mostrar detalles de la consulta seleccionada
-        function mostrarDetallesConsulta(consultaId) {
-            const detallesDiv = document.getElementById('detallesConsulta');
+    function mostrarDetallesConsulta(consultaId) {
+        const detallesDiv = document.getElementById('detallesConsulta');
 
-            if (!consultaId) {
-                detallesDiv.classList.add('d-none');
-                return;
-            }
+        if (!consultaId) {
+            detallesDiv.classList.add('d-none');
+            return;
+        }
 
-            // Obtener la opción seleccionada
-            const selectElement = document.getElementById('seleccionar_consulta');
-            const selectedOption = selectElement.querySelector(`option[value="${consultaId}"]`);
+        // Obtener la opción seleccionada
+        const selectElement = document.getElementById('seleccionar_consulta');
+        const selectedOption = selectElement.querySelector(`option[value="${consultaId}"]`);
 
-            if (selectedOption) {
-                // Llenar los detalles
-                document.getElementById('detalle-paciente').textContent = selectedOption.dataset.paciente;
-                document.getElementById('detalle-cedula').textContent = selectedOption.dataset.cedula;
-                document.getElementById('detalle-telefono').textContent = selectedOption.dataset.telefono || 'No registrado';
-                document.getElementById('detalle-fecha').textContent = selectedOption.dataset.fecha;
-                document.getElementById('detalle-hora').textContent = selectedOption.dataset.hora;
-                document.getElementById('detalle-especialidad').textContent = selectedOption.dataset.especialidad;
-                document.getElementById('detalle-sucursal').textContent = selectedOption.dataset.sucursal;
-                document.getElementById('detalle-recetas').textContent = selectedOption.dataset.recetas;
+        if (selectedOption) {
+            // Llenar los detalles
+            document.getElementById('detalle-paciente').textContent = selectedOption.dataset.paciente;
+            document.getElementById('detalle-cedula').textContent = selectedOption.dataset.cedula;
+            document.getElementById('detalle-telefono').textContent = selectedOption.dataset.telefono || 'No registrado';
+            document.getElementById('detalle-fecha').textContent = selectedOption.dataset.fecha;
+            document.getElementById('detalle-hora').textContent = selectedOption.dataset.hora;
+            document.getElementById('detalle-especialidad').textContent = selectedOption.dataset.especialidad;
+            document.getElementById('detalle-sucursal').textContent = selectedOption.dataset.sucursal;
+            document.getElementById('detalle-recetas').textContent = selectedOption.dataset.recetas;
 
-                // Solo mostrar médico si es admin
-    <?php if ($_SESSION['role_id'] == 1): ?>
-                    document.getElementById('detalle-medico').textContent = selectedOption.dataset.medico;
-    <?php endif; ?>
+            // Solo mostrar médico si es admin
+<?php if ($_SESSION['role_id'] == 1): ?>
+                document.getElementById('detalle-medico').textContent = selectedOption.dataset.medico;
+<?php endif; ?>
 
             // Mostrar motivo y diagnóstico si existen
             const motivoContainer = document.getElementById('detalle-motivo-container');
@@ -805,13 +803,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             toast.className = 'toast align-items-center text-white bg-success border-0 position-fixed top-0 end-0 m-3';
             toast.style.zIndex = '1055';
             toast.innerHTML = `
-           <div class="d-flex">
-               <div class="toast-body">
-                   <i class="fas fa-check-circle me-2"></i>Plantilla aplicada: ${plantilla.medicamento}
-               </div>
-               <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+       <div class="d-flex">
+           <div class="toast-body">
+               <i class="fas fa-check-circle me-2"></i>Plantilla aplicada: ${plantilla.medicamento}
            </div>
-       `;
+           <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+       </div>
+   `;
 
             document.body.appendChild(toast);
             const bsToast = new bootstrap.Toast(toast);
