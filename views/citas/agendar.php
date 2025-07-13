@@ -656,29 +656,26 @@ include 'views/includes/navbar.php';
                                                 <span class="text-danger">*</span>
                                             <?php endif; ?>
                                         </label>
-                                        <div class="input-group">
+                                        <div class="input-group position-relative"> <!-- AGREGAR position-relative aquí -->
                                             <input type="text" class="form-control form-control-lg" 
                                                    name="cedula_paciente" id="cedulaPaciente" 
                                                    placeholder="Escriba el número de cédula..." 
                                                    maxlength="10" 
                                                    autocomplete="off"
                                                    <?php if ($_SESSION['role_id'] == 4): ?>
-                                                       value="<?php echo htmlspecialchars($datosUsuario['cedula'] ?? ''); ?>"
+                                                       value="<?php echo htmlspecialchars($datosUsuarioActual['cedula'] ?? ''); ?>"
                                                    <?php else: ?>
                                                        required
                                                    <?php endif; ?>>
                                             <div class="input-group-text" id="cedulaStatus">
                                                 <i class="fas fa-search text-muted"></i>
                                             </div>
-                                        </div>
 
-                                        <!-- Dropdown de sugerencias -->
-                                        <div id="cedulaSugerencias" class="dropdown-menu w-100" style="display: none;">
-                                            <div class="dropdown-header">
-                                                <i class="fas fa-users text-primary"></i> Pacientes encontrados
-                                            </div>
-                                            <div id="listaSugerencias">
-                                                <!-- Sugerencias dinámicas -->
+                                            <!-- Dropdown de sugerencias -->
+                                            <div id="cedulaSugerencias" class="sugerencias-dropdown" style="display: none;">
+                                                <div id="listaSugerencias">
+                                                    <!-- Sugerencias dinámicas -->
+                                                </div>
                                             </div>
                                         </div>
 
@@ -1372,6 +1369,89 @@ include 'views/includes/navbar.php';
 
     .sugerencia-item:last-child {
         border-bottom: none;
+    }
+
+    /* Estilos para dropdown de sugerencias - FORZAR VISIBILIDAD */
+    .sugerencias-dropdown {
+        position: absolute !important;
+        top: calc(100% + 2px) !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-height: 400px !important;
+        overflow-y: auto !important;
+        background: white !important;
+        border: 2px solid #007bff !important;
+        border-radius: 10px !important;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+        z-index: 9999 !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    .sugerencias-dropdown[style*="display: block"] {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    .sugerencias-dropdown .dropdown-header {
+        background: #f8f9fa !important;
+        padding: 8px 16px !important;
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        color: #495057 !important;
+        border-bottom: 1px solid #dee2e6 !important;
+        margin: 0 !important;
+    }
+
+    .sugerencias-dropdown .sugerencia-item {
+        padding: 12px 16px !important;
+        cursor: pointer !important;
+        transition: background 0.2s ease !important;
+        border-bottom: 1px solid #f8f9fa !important;
+        display: block !important;
+        margin: 0 !important;
+        background: white !important;
+    }
+
+    .sugerencias-dropdown .sugerencia-item:hover {
+        background: #e3f2fd !important;
+    }
+
+    .sugerencias-dropdown .sugerencia-item:last-child {
+        border-bottom: none !important;
+        border-radius: 0 0 8px 8px !important;
+    }
+
+    .sugerencias-dropdown .avatar-sm {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 0.8rem !important;
+        background: #007bff !important;
+        color: white !important;
+    }
+
+    .sugerencias-dropdown mark {
+        background-color: #fff3cd !important;
+        padding: 1px 2px !important;
+        border-radius: 2px !important;
+    }
+
+    .position-relative {
+        position: relative !important;
+    }
+
+    /* Asegurar que el input tenga el contenedor relativo */
+    .input-group {
+        position: relative !important;
+    }
+
+    /* Debugging - temporal */
+    .sugerencias-dropdown {
+        border: 3px solid red !important; /* Para ver si aparece */
+        min-height: 50px !important; /* Altura mínima */
     }
 
     /* ================================
@@ -3370,70 +3450,81 @@ include 'views/includes/navbar.php';
     }
 
     function mostrarSugerenciasPacientes(pacientes, criterio) {
+        console.log('📋 Mostrando sugerencias para:', {pacientes, criterio});
+
         const dropdown = document.getElementById('cedulaSugerencias');
         const lista = document.getElementById('listaSugerencias');
+
+        if (!dropdown || !lista) {
+            console.error('❌ Elementos del dropdown no encontrados');
+            return;
+        }
+
+        // CORRECCIÓN: Limpiar estilos previos y forzar visibilidad
+        dropdown.removeAttribute('style');
+        dropdown.className = 'sugerencias-dropdown'; // Usar clase específica
 
         // Limpiar lista anterior
         lista.innerHTML = '';
 
         // Agregar header
         const header = document.createElement('div');
-        header.className = 'dropdown-header d-flex justify-content-between align-items-center';
+        header.className = 'dropdown-header';
         header.innerHTML = `
-            <span><i class="fas fa-users text-primary"></i> Pacientes encontrados</span>
-            <small class="text-muted">${pacientes.length} resultado(s)</small>
-        `;
+        <i class="fas fa-users text-primary"></i> Pacientes encontrados
+        <small class="text-muted ms-2">${pacientes.length} resultado(s)</small>
+    `;
         lista.appendChild(header);
 
         // Agregar pacientes
         pacientes.forEach((paciente, index) => {
+            console.log('👤 Procesando paciente:', paciente);
+
             const item = document.createElement('div');
             item.className = 'sugerencia-item';
-            item.setAttribute('data-paciente-id', paciente.id_usuario);
 
-            // Resaltar coincidencias
-            const nombreCompleto = paciente.nombre_completo;
+            const nombreCompleto = paciente.nombre_completo || 'Nombre no disponible';
             const nombreResaltado = resaltarCoincidencias(nombreCompleto, criterio);
             const cedulaResaltada = resaltarCoincidencias(paciente.cedula || '', criterio);
 
             item.innerHTML = `
-                <div class="d-flex align-items-center">
-                    <div class="flex-shrink-0 me-3">
-                        <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center">
-                            ${nombreCompleto.split(' ')[0]?.charAt(0) || 'P'}${nombreCompleto.split(' ')[1]?.charAt(0) || ''}
-                        </div>
-                    </div>
-                    <div class="flex-grow-1">
-                        <h6 class="mb-1">${nombreResaltado}</h6>
-                        <div class="d-flex align-items-center text-muted small">
-                            <span class="me-3">
-                                <i class="fas fa-id-card me-1"></i>
-                                CI: ${cedulaResaltada || 'N/A'}
+            <div class="d-flex align-items-center">
+                <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3">
+                    ${nombreCompleto.split(' ')[0]?.charAt(0) || 'P'}${nombreCompleto.split(' ')[1]?.charAt(0) || ''}
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="mb-1 fs-6">${nombreResaltado}</h6>
+                    <div class="small text-muted">
+                        <span class="me-3">
+                            <i class="fas fa-id-card me-1"></i>
+                            CI: ${cedulaResaltada || 'N/A'}
+                        </span>
+                        <span class="me-3">
+                            <i class="fas fa-envelope me-1"></i>
+                            ${paciente.email || 'No especificado'}
+                        </span>
+                        ${paciente.telefono ? `
+                            <span>
+                                <i class="fas fa-phone me-1"></i>
+                                ${paciente.telefono}
                             </span>
-                            <span class="me-3">
-                                <i class="fas fa-envelope me-1"></i>
-                                ${paciente.email}
-                            </span>
-                            ${paciente.telefono ?
-                    `<span>
-                                    <i class="fas fa-phone me-1"></i>
-                                    ${paciente.telefono}
-                                </span>` : ''
-                    }
-                        </div>
-                    </div>
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-mouse-pointer text-primary"></i>
+                        ` : ''}
                     </div>
                 </div>
-            `;
+                <div>
+                    <i class="fas fa-mouse-pointer text-primary"></i>
+                </div>
+            </div>
+        `;
 
-            // Event listener para selección
-            item.addEventListener('click', function () {
+            // Event listeners
+            item.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🖱️ Click en paciente:', paciente);
                 seleccionarPacienteDeBd(paciente);
             });
 
-            // Efecto hover
             item.addEventListener('mouseenter', function () {
                 this.style.backgroundColor = '#e3f2fd';
             });
@@ -3445,37 +3536,12 @@ include 'views/includes/navbar.php';
             lista.appendChild(item);
         });
 
-        // Agregar opción para usar API si la cédula es válida
-        if (criterio.length === 10 && validarCedulaEcuatoriana(criterio)) {
-            const divider = document.createElement('div');
-            divider.className = 'dropdown-divider';
-            lista.appendChild(divider);
-
-            const apiOption = document.createElement('div');
-            apiOption.className = 'sugerencia-item text-center';
-            apiOption.innerHTML = `
-                <div class="py-2">
-                    <i class="fas fa-search text-info fa-lg mb-2"></i>
-                    <div class="small">
-                        <strong>¿No encuentra al paciente?</strong><br>
-                        <span class="text-muted">Consulte en el Registro Civil</span>
-                    </div>
-                </div>
-            `;
-
-            apiOption.addEventListener('click', function () {
-                ocultarSugerencias();
-                consultarCedulaApi();
-            });
-
-            lista.appendChild(apiOption);
-        }
-
         // Mostrar dropdown
         dropdown.style.display = 'block';
-        dropdown.style.animation = 'slideInDown 0.3s ease-out';
+        dropdown.style.visibility = 'visible';
+        dropdown.style.opacity = '1';
 
-        console.log(`✅ Mostrando ${pacientes.length} sugerencias`);
+        console.log(`✅ Mostrando ${pacientes.length} sugerencias correctamente`);
     }
 
     function mostrarSugerenciaApi(cedula) {
@@ -4138,6 +4204,7 @@ include 'views/includes/navbar.php';
 
 
 
+    // Función corregida para preparar datos para envío
     function prepararDatosParaEnvio(formData) {
         const datos = {
             // Datos básicos de la cita
@@ -4154,20 +4221,26 @@ include 'views/includes/navbar.php';
             estado_cita: estadoCitaSegunRol[<?php echo $_SESSION['role_id']; ?>] || 'agendada'
         };
 
-        // Datos del paciente según el contexto
+        // CORRECCIÓN: Lógica mejorada para determinar el paciente correcto
         if (esUsuarioPaciente) {
             const esCitaParaConocido = document.getElementById('esParaConocido').value === '1';
 
             if (esCitaParaConocido) {
-                // Cita para conocido - usar datos del formulario
-                datos.nombre_paciente = formData.get('nombre_paciente');
-                datos.apellido_paciente = formData.get('apellido_paciente');
-                datos.cedula_paciente = formData.get('cedula_paciente');
-                datos.email_paciente = formData.get('email_paciente');
-                datos.telefono_paciente = formData.get('telefono_paciente');
-                datos.fecha_nacimiento_paciente = formData.get('fecha_nacimiento_paciente');
-                datos.genero_paciente = formData.get('genero_paciente');
-                datos.direccion_paciente = formData.get('direccion_paciente');
+                // Cita para conocido - crear/buscar paciente
+                if (pacienteSeleccionadoBd) {
+                    datos.id_paciente_existente = document.getElementById('idPacienteSeleccionado').value;
+                    datos.paciente_desde_bd = true;
+                } else {
+                    // Nuevo paciente
+                    datos.nombre_paciente = formData.get('nombre_paciente');
+                    datos.apellido_paciente = formData.get('apellido_paciente');
+                    datos.cedula_paciente = formData.get('cedula_paciente');
+                    datos.email_paciente = formData.get('email_paciente');
+                    datos.telefono_paciente = formData.get('telefono_paciente');
+                    datos.fecha_nacimiento_paciente = formData.get('fecha_nacimiento_paciente');
+                    datos.genero_paciente = formData.get('genero_paciente');
+                    datos.direccion_paciente = formData.get('direccion_paciente');
+                }
                 datos.es_para_conocido = true;
                 datos.id_paciente_solicitante = <?php echo $_SESSION['user_id']; ?>;
             } else {
@@ -4175,22 +4248,33 @@ include 'views/includes/navbar.php';
                 datos.id_paciente_existente = <?php echo $_SESSION['user_id']; ?>;
             }
         } else {
-            // Admin/Recepcionista agendando
+            // CORRECCIÓN: Admin/Recepcionista agendando - NUNCA usar su propio ID
             if (pacienteSeleccionadoBd) {
                 // Paciente existente seleccionado de BD
                 datos.id_paciente_existente = document.getElementById('idPacienteSeleccionado').value;
                 datos.paciente_desde_bd = true;
+                console.log('📋 Usando paciente existente de BD:', datos.id_paciente_existente);
             } else {
-                // Nuevo paciente o datos actualizados
+                // Nuevo paciente o datos para crear/actualizar
+                const cedula = formData.get('cedula_paciente');
+                if (!cedula) {
+                    throw new Error('La cédula del paciente es obligatoria');
+                }
+
                 datos.nombre_paciente = formData.get('nombre_paciente');
                 datos.apellido_paciente = formData.get('apellido_paciente');
-                datos.cedula_paciente = formData.get('cedula_paciente');
+                datos.cedula_paciente = cedula;
                 datos.email_paciente = formData.get('email_paciente');
                 datos.telefono_paciente = formData.get('telefono_paciente');
                 datos.fecha_nacimiento_paciente = formData.get('fecha_nacimiento_paciente');
                 datos.genero_paciente = formData.get('genero_paciente');
                 datos.direccion_paciente = formData.get('direccion_paciente');
+                datos.crear_paciente_si_no_existe = true;
+                console.log('📋 Creando/actualizando paciente con cédula:', cedula);
             }
+
+            // IMPORTANTE: Nunca usar el ID del usuario que agenda (recepcionista/admin)
+            datos.id_usuario_registro = <?php echo $_SESSION['user_id']; ?>;
         }
 
         console.log('📦 Datos preparados para envío:', datos);
@@ -4373,19 +4457,43 @@ include 'views/includes/navbar.php';
             const form = document.getElementById('formAgendamiento');
             const formData = new FormData(form);
 
-            // Agregar datos adicionales
+            // Agregar datos adicionales de la cita
             formData.append('fecha_cita', document.getElementById('fechaCita').value);
             formData.append('tipo_cita', datosFormulario.tipo_cita);
             formData.append('id_especialidad', datosFormulario.id_especialidad);
             formData.append('id_sucursal', datosFormulario.id_sucursal);
             formData.append('id_medico', datosFormulario.id_medico);
             formData.append('hora_cita', datosFormulario.hora_cita);
-            formData.append('action', 'agendar_cita'); // CLAVE: esto activa el procesamiento alternativo
+            formData.append('action', 'agendar_cita');
+
+            // CORRECCIÓN: Manejar correctamente el ID del paciente
+            if (!esUsuarioPaciente) {
+                // Para admin/recepcionista
+                if (pacienteSeleccionadoBd) {
+                    formData.append('id_paciente', document.getElementById('idPacienteSeleccionado').value);
+                    formData.append('paciente_existente', '1');
+                } else {
+                    // Se creará un nuevo paciente con los datos del formulario
+                    formData.append('crear_paciente', '1');
+                }
+            } else {
+                // Para pacientes
+                const esCitaParaConocido = document.getElementById('esParaConocido').value === '1';
+                if (esCitaParaConocido) {
+                    if (pacienteSeleccionadoBd) {
+                        formData.append('id_paciente', document.getElementById('idPacienteSeleccionado').value);
+                    } else {
+                        formData.append('crear_paciente', '1');
+                    }
+                } else {
+                    formData.append('id_paciente', <?php echo $_SESSION['user_id']; ?>);
+                }
+            }
 
             console.log('📤 Enviando datos via método alternativo');
 
             // Usar fetch con FormData
-            const response = await fetch(window.location.href, {// URL actual
+            const response = await fetch(window.location.href, {
                 method: 'POST',
                 body: formData
             });

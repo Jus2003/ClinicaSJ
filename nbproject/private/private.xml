@@ -30,6 +30,11 @@
             <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/triaje/completar.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/triaje/ver_respuestas.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/includes/tcpdf_config.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/models/Notificacion.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/config/database.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/api/buscar-paciente.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/controllers/ajax_controller.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/includes/fpdf/font/helvetica.php</file>
         </group>
     </open-files>
 </project-private>
