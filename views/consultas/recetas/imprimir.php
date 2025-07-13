@@ -1,4 +1,6 @@
 <?php
+
+// AL INICIO DEL ARCHIVO views/consultas/recetas/imprimir.php
 // Verificar autenticación
 if (!isset($_SESSION['user_id'])) {
     header('Location: index.php?action=login');
@@ -11,14 +13,18 @@ if (!in_array($_SESSION['role_id'], [1, 2, 3, 4])) {
     exit;
 }
 
-require_once 'config/database.php';
-require_once 'includes/fpdf/fpdf.php';
+// DEFINIR LA RUTA BASE DEL PROYECTO
+define('PROJECT_ROOT', dirname(__DIR__, 3)); // Subir 3 niveles desde views/consultas/recetas/
+// INCLUIR ARCHIVOS CON RUTAS ABSOLUTAS
+require_once PROJECT_ROOT . '/config/database.php';
+require_once PROJECT_ROOT . '/includes/fpdf/fpdf.php';
 
+// El resto del código sigue igual...
 $database = new Database();
 $db = $database->getConnection();
 
 // Obtener ID de la receta
-$id_receta = (int)($_GET['id'] ?? 0);
+$id_receta = (int) ($_GET['id'] ?? 0);
 
 if (!$id_receta) {
     header('Location: index.php?action=consultas/recetas');
@@ -81,7 +87,8 @@ if (!$receta) {
 
 // Función para calcular edad
 function calcularEdad($fechaNacimiento) {
-    if (!$fechaNacimiento) return 'N/A';
+    if (!$fechaNacimiento)
+        return 'N/A';
     $nacimiento = new DateTime($fechaNacimiento);
     $hoy = new DateTime();
     return $nacimiento->diff($hoy)->y . ' años';
@@ -89,36 +96,37 @@ function calcularEdad($fechaNacimiento) {
 
 // Clase personalizada para la receta
 class RecetaPDF extends FPDF {
+
     private $receta;
-    
+
     function __construct($receta) {
         parent::__construct();
         $this->receta = $receta;
     }
-    
+
     // Encabezado de página
     function Header() {
         // Logo o nombre de la clínica
         $this->SetFont('Arial', 'B', 20);
         $this->SetTextColor(0, 102, 204);
         $this->Cell(0, 15, utf8_decode('CLÍNICA MÉDICA'), 0, 1, 'C');
-        
+
         $this->SetFont('Arial', '', 12);
         $this->SetTextColor(100, 100, 100);
         $this->Cell(0, 8, utf8_decode($this->receta['nombre_sucursal']), 0, 1, 'C');
         $this->Cell(0, 6, utf8_decode($this->receta['sucursal_direccion']), 0, 1, 'C');
         $this->Cell(0, 6, utf8_decode('Teléfono: ' . $this->receta['sucursal_telefono']), 0, 1, 'C');
-        
+
         $this->Ln(10);
-        
+
         // Título de receta
         $this->SetFont('Arial', 'B', 18);
         $this->SetTextColor(0, 0, 0);
         $this->Cell(0, 12, utf8_decode('RECETA MÉDICA'), 0, 1, 'C');
-        
+
         $this->Ln(5);
     }
-    
+
     // Pie de página
     function Footer() {
         $this->SetY(-15);
@@ -126,17 +134,17 @@ class RecetaPDF extends FPDF {
         $this->SetTextColor(128, 128, 128);
         $this->Cell(0, 10, utf8_decode('Receta médica - Generado el ' . date('d/m/Y H:i')), 0, 0, 'C');
     }
-    
+
     // Función para agregar información en formato de tabla
     function addInfoSection($title, $data) {
         $this->SetFont('Arial', 'B', 12);
         $this->SetFillColor(240, 248, 255);
         $this->SetTextColor(0, 102, 204);
         $this->Cell(0, 8, utf8_decode($title), 1, 1, 'L', true);
-        
+
         $this->SetFont('Arial', '', 10);
         $this->SetTextColor(0, 0, 0);
-        
+
         foreach ($data as $label => $value) {
             if ($value) {
                 $this->Cell(50, 6, utf8_decode($label . ':'), 1, 0, 'L');
@@ -145,18 +153,19 @@ class RecetaPDF extends FPDF {
         }
         $this->Ln(3);
     }
-    
+
     // Función para texto multilinea
     function addMultilineText($title, $text, $maxWidth = 180) {
-        if (!$text) return;
-        
+        if (!$text)
+            return;
+
         $this->SetFont('Arial', 'B', 11);
         $this->SetTextColor(0, 102, 204);
         $this->Cell(0, 7, utf8_decode($title), 0, 1, 'L');
-        
+
         $this->SetFont('Arial', '', 10);
         $this->SetTextColor(0, 0, 0);
-        
+
         // Dividir el texto en líneas
         $lines = explode("\n", $text);
         foreach ($lines as $line) {
