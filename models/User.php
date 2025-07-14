@@ -535,9 +535,9 @@ class User {
         $stmt->execute(['paciente_id' => $pacienteId]);
         return $stmt->fetchAll();
     }
-    
+
     public function getRecetasConsulta($consultaId) {
-    $sql = "SELECT 
+        $sql = "SELECT 
                 r.id_receta,
                 r.codigo_receta,
                 r.medicamento,
@@ -554,11 +554,60 @@ class User {
             FROM recetas r
             WHERE r.id_consulta = :consulta_id
             ORDER BY r.fecha_emision DESC";
-    
-    $stmt = $this->db->prepare($sql);
-    $stmt->execute(['consulta_id' => $consultaId]);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['consulta_id' => $consultaId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Obtener lista de pacientes para historial médico
+     * @param string $search Término de búsqueda opcional
+     * @return array Lista de pacientes
+     */
+    public function getPacientesList($search = '') {
+        try {
+            $sql = "SELECT 
+                    u.id_usuario,
+                    u.nombre,
+                    u.apellido,
+                    u.cedula,
+                    u.email,
+                    u.telefono,
+                    u.fecha_registro,
+                    u.activo,
+                    COUNT(c.id_cita) as total_citas,
+                    MAX(c.fecha_cita) as ultima_cita
+                FROM usuarios u 
+                LEFT JOIN citas c ON u.id_usuario = c.id_paciente
+                WHERE u.id_rol = 4 
+                AND u.activo = 1";
+
+            $params = [];
+
+            if (!empty($search)) {
+                $sql .= " AND (
+                u.nombre LIKE :search OR 
+                u.apellido LIKE :search OR 
+                u.cedula LIKE :search OR
+                CONCAT(u.nombre, ' ', u.apellido) LIKE :search
+            )";
+                $params['search'] = "%{$search}%";
+            }
+
+            $sql .= " GROUP BY u.id_usuario
+                  ORDER BY u.nombre ASC, u.apellido ASC 
+                  LIMIT 50";
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Error en getPacientesList: " . $e->getMessage());
+            return [];
+        }
+    }
 }
 
 ?>
