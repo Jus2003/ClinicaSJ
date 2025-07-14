@@ -493,6 +493,35 @@ class User {
         $stmt->execute(['paciente_id' => $pacienteId]);
         return $stmt->fetchAll();
     }
+
+    // Agregar este método al archivo models/User.php
+    public function getHistorialPacienteCompleto($pacienteId) {
+        $sql = "SELECT 
+            c.id_cita,
+            c.fecha_cita,
+            c.hora_cita,
+            c.tipo_cita,
+            c.estado_cita,
+            c.motivo_consulta,
+            CONCAT(m.nombre, ' ', m.apellido) as nombre_medico,
+            e.nombre_especialidad,
+            s.nombre_sucursal,
+            con.diagnostico_principal,
+            con.tratamiento,
+            con.observaciones_medicas,
+            con.fecha_consulta
+        FROM citas c
+        INNER JOIN usuarios m ON c.id_medico = m.id_usuario
+        INNER JOIN especialidades e ON c.id_especialidad = e.id_especialidad
+        INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
+        LEFT JOIN consultas con ON c.id_cita = con.id_cita
+        WHERE c.id_paciente = :paciente_id
+        ORDER BY c.fecha_cita DESC, c.hora_cita DESC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['paciente_id' => $pacienteId]);
+        return $stmt->fetchAll();
+    }
 }
 
 ?>

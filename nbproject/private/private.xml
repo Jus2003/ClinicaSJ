@@ -3,38 +3,27 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/citas/agenda.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/api/agendar-cita.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/controllers/PacientesController.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/includes/fpdf/font/helveticai.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/api/obtener-horarios-medico.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/includes/cedula-api.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/views/citas/agendar.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/triaje/ver.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/api/cambiar-estado-cita.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/descargar_pdf.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/includes/fpdf/font/helveticab.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/pacientes/historial.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/api/obtener-medicos.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/models/User.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/recetas/crear.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/recetas/index.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/triaje_respuestas.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/includes/fpdf/font/helveticabi.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/views/api/consultar-cedula.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/index.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/models/Cita.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/ajax/get_triaje_respuestas.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/api/agendar-cita.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/email-sender.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/fpdf/fpdf.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/controllers/CitaController.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/models/TriajeModel.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/pdf_generator.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/citas/gestionar.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/password-generator.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/pacientes/historial.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/citas/disponibilidad.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/triaje_respuestas.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/triaje/gestionar.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/citas/pagar.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/triaje/completar.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/triaje/ver_respuestas.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/includes/tcpdf_config.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/models/Notificacion.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/config/database.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/views/api/buscar-paciente.php</file>
-            <file>file:/C:/wamp64/www/sistema_clinica/controllers/ajax_controller.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/recetas/detalle.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/includes/email-config.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/includes/email-sender.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/consultas/recetas/imprimir.php</file>
             <file>file:/C:/wamp64/www/sistema_clinica/includes/fpdf/font/helvetica.php</file>
+            <file>file:/C:/wamp64/www/sistema_clinica/views/api/obtener-horarios.php</file>
         </group>
     </open-files>
 </project-private>

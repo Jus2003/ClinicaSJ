@@ -1308,10 +1308,12 @@ include 'views/includes/navbar.php';
         font-size: 1rem;
     }
 
-    .form-control-lg:focus, .form-select-lg:focus {
-        border-color: #007bff;
-        box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.15);
-        transform: translateY(-1px);
+    .form-control-lg {
+        border-radius: 10px;
+        border: 2px solid #e9ecef;
+        padding: 0.75rem 1rem;
+        transition: all 0.3s ease;
+        font-size: 1rem;
     }
 
     .form-label.fw-semibold {
@@ -1319,6 +1321,21 @@ include 'views/includes/navbar.php';
         margin-bottom: 0.75rem;
         font-size: 0.95rem;
     }
+
+    .form-control-lg:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.15);
+        transform: translateY(-1px);
+    }
+    .form-control-lg.is-valid {
+        border-color: #28a745;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%2328a745' d='m2.3 6.73.04-.04L4.46 4.57 3.43 3.54a.75.75 0 1 0-1.06 1.06l.04.04-.04.04v.01.01l-.05.05v.01.01l-.05.05v.01.01l-.06.05v.01.01l-.06.05v.01.01l-.06.04v.01.01l-.07.04v.01.01l-.07.04v.01.01l-.07.03v.01.01l-.08.03v.01.01l-.08.02v.01.01l-.08.02v.01.01l-.09.01h-.01.01l-.09.01h-.01.01l-.09-.01h-.01.01l-.09-.01h-.01.01l-.08-.02v-.01.01l-.08-.02v-.01.01l-.08-.03v-.01.01l-.07-.03v-.01.01l-.07-.04v-.01.01l-.07-.04v-.01.01l-.06-.04v-.01.01l-.06-.05v-.01.01l-.06-.05v-.01.01l-.05-.05v-.01.01l-.05-.05v-.01.01l-.04-.04 1.4-1.4a.75.75 0 0 1 1.06 0z'/%3e%3c/svg%3e");
+    }
+    .form-control-lg.is-valid {
+        border-color: #28a745;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%2328a745' d='m2.3 6.73.04-.04L4.46 4.57 3.43 3.54a.75.75 0 1 0-1.06 1.06l.04.04-.04.04v.01.01l-.05.05v.01.01l-.05.05v.01.01l-.06.05v.01.01l-.06.05v.01.01l-.06.04v.01.01l-.07.04v.01.01l-.07.04v.01.01l-.07.03v.01.01l-.08.03v.01.01l-.08.02v.01.01l-.08.02v.01.01l-.09.01h-.01.01l-.09.01h-.01.01l-.09-.01h-.01.01l-.09-.01h-.01.01l-.08-.02v-.01.01l-.08-.02v-.01.01l-.08-.03v-.01.01l-.07-.03v-.01.01l-.07-.04v-.01.01l-.07-.04v-.01.01l-.06-.04v-.01.01l-.06-.05v-.01.01l-.06-.05v-.01.01l-.05-.05v-.01.01l-.05-.05v-.01.01l-.04-.04 1.4-1.4a.75.75 0 0 1 1.06 0z'/%3e%3c/svg%3e");
+    }
+
 
     /* ================================
        ALERTS Y NOTIFICACIONES
@@ -1385,9 +1402,18 @@ include 'views/includes/navbar.php';
         border-radius: 10px !important;
         box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
         z-index: 9999 !important;
+        opacity: 0;
+        transform: translateY(-10px);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: none;
+        visibility: hidden;
+    }
+    /* Cuando se muestra */
+    .sugerencias-dropdown.show {
         display: block !important;
         visibility: visible !important;
         opacity: 1 !important;
+        transform: translateY(0) !important;
     }
 
     .sugerencias-dropdown[style*="display: block"] {
@@ -1450,8 +1476,7 @@ include 'views/includes/navbar.php';
 
     /* Debugging - temporal */
     .sugerencias-dropdown {
-        border: 3px solid red !important; /* Para ver si aparece */
-        min-height: 50px !important; /* Altura mínima */
+        border: 2px solid #007bff !important; /* Cambiar de rojo a azul */
     }
 
     /* ================================
@@ -1758,10 +1783,16 @@ include 'views/includes/navbar.php';
         if (!cedulaInput)
             return;
 
+        // CORRECCIÓN: Remover estilos por defecto
+        cedulaInput.classList.remove('is-valid', 'is-invalid');
+
         // Búsqueda en tiempo real mientras escribe
         cedulaInput.addEventListener('input', function () {
             const valor = this.value.replace(/\D/g, ''); // Solo números
             this.value = valor;
+
+            // CORRECCIÓN: Limpiar clases de validación al escribir
+            this.classList.remove('is-valid', 'is-invalid');
 
             // Validar y buscar
             validarYBuscarCedula(valor);
@@ -1769,7 +1800,8 @@ include 'views/includes/navbar.php';
 
         // Configurar dropdown de sugerencias
         document.addEventListener('click', function (e) {
-            if (!document.getElementById('cedulaSugerencias').contains(e.target)) {
+            if (!document.getElementById('cedulaSugerencias').contains(e.target) &&
+                    !e.target.closest('#cedulaPaciente')) {
                 ocultarSugerencias();
             }
         });
@@ -3462,7 +3494,7 @@ include 'views/includes/navbar.php';
 
         // CORRECCIÓN: Limpiar estilos previos y forzar visibilidad
         dropdown.removeAttribute('style');
-        dropdown.className = 'sugerencias-dropdown'; // Usar clase específica
+        dropdown.className = 'sugerencias-dropdown show';
 
         // Limpiar lista anterior
         lista.innerHTML = '';
@@ -3606,12 +3638,13 @@ include 'views/includes/navbar.php';
 
         // Actualizar UI
         const cedulaInput = document.getElementById('cedulaPaciente');
+        cedulaInput.classList.remove('is-invalid'); // CORRECCIÓN: Solo remover invalid
         cedulaInput.classList.add('is-valid');
         cedulaInput.value = paciente.cedula || '';
 
         document.getElementById('cedulaStatus').innerHTML = '<i class="fas fa-check text-success"></i>';
 
-        // Ocultar sugerencias
+        // CORRECCIÓN: Ocultar sugerencias inmediatamente
         ocultarSugerencias();
 
         // Mostrar mensaje de éxito
@@ -3800,7 +3833,20 @@ include 'views/includes/navbar.php';
     function ocultarSugerencias() {
         const dropdown = document.getElementById('cedulaSugerencias');
         if (dropdown) {
-            dropdown.style.display = 'none';
+            // CORRECCIÓN: Ocultar completamente con animación
+            dropdown.style.opacity = '0';
+            dropdown.style.transform = 'translateY(-10px)';
+
+            setTimeout(() => {
+                dropdown.style.display = 'none';
+                dropdown.style.visibility = 'hidden';
+
+                // Limpiar contenido para evitar problemas
+                const lista = document.getElementById('listaSugerencias');
+                if (lista) {
+                    lista.innerHTML = '';
+                }
+            }, 200);
         }
     }
 
