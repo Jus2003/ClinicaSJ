@@ -466,24 +466,37 @@ class User {
         ]);
     }
 
-    // Agregar este método a models/User.php
-    // Reemplaza el método getHistorialPaciente() en models/User.php
     public function getHistorialPaciente($pacienteId) {
         $sql = "SELECT 
                 c.id_cita,
                 c.fecha_cita,
                 c.hora_cita,
                 c.tipo_cita,
-                c.estado_cita,
                 c.motivo_consulta,
-                CONCAT(m.nombre, ' ', m.apellido) as nombre_medico,
+                c.estado_cita,
+                CONCAT(m.nombre, ' ', m.apellido) as medico_nombre,
                 e.nombre_especialidad,
                 s.nombre_sucursal,
+                
+                -- Datos de la consulta médica
+                con.id_consulta,
                 con.diagnostico_principal,
-                con.tratamiento
+                con.diagnosticos_secundarios,
+                con.tratamiento,
+                con.sintomas,
+                con.examen_fisico,
+                con.recomendaciones,
+                con.observaciones_medicas,
+                con.fecha_consulta,
+                
+                -- Contar recetas asociadas
+                (SELECT COUNT(*) 
+                 FROM recetas r 
+                 WHERE r.id_consulta = con.id_consulta) as total_recetas
+                
             FROM citas c
             INNER JOIN usuarios m ON c.id_medico = m.id_usuario
-            INNER JOIN especialidades e ON c.id_especialidad = e.id_especialidad
+            INNER JOIN especialidades e ON c.id_especialidad = e.id_especialidad  
             INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
             LEFT JOIN consultas con ON c.id_cita = con.id_cita
             WHERE c.id_paciente = :paciente_id
@@ -491,7 +504,7 @@ class User {
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['paciente_id' => $pacienteId]);
-        return $stmt->fetchAll();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     // Agregar este método al archivo models/User.php
@@ -522,6 +535,30 @@ class User {
         $stmt->execute(['paciente_id' => $pacienteId]);
         return $stmt->fetchAll();
     }
+    
+    public function getRecetasConsulta($consultaId) {
+    $sql = "SELECT 
+                r.id_receta,
+                r.codigo_receta,
+                r.medicamento,
+                r.concentracion,
+                r.forma_farmaceutica,
+                r.dosis,
+                r.frecuencia,
+                r.duracion,
+                r.cantidad,
+                r.indicaciones_especiales,
+                r.fecha_emision,
+                r.fecha_vencimiento,
+                r.estado
+            FROM recetas r
+            WHERE r.id_consulta = :consulta_id
+            ORDER BY r.fecha_emision DESC";
+    
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute(['consulta_id' => $consultaId]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 }
 
 ?>
